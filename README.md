@@ -11,3 +11,9 @@
 - Article + Implementation: https://www.geekering.com/programming-languages/python/brunorsilva/harris-corner-detector-python/
 - Video Comparing between the two that will be useful for the report part: https://www.youtube.com/watch?v=ihMmZvlvOko
 - Videos to Fully Understand The Concept beginning with sobel gradient: https://www.youtube.com/watch?v=PxzaXOd_nHs&list=PLyhJeMedQd9SljfbRUTLAtGQhB1zZQ23z These 3 & https://www.youtube.com/watch?v=RhxlypyC8GI
+
+## SIFT
+- Useful Paper with pseudocode https://www.ipol.im/pub/art/2014/82/
+- Implementation https://medium.com/@russmislam/implementing-sift-in-python-a-complete-guide-part-1-306a99b50aa5
+- Implementation https://lerner98.medium.com/implementing-sift-in-python-36c619df7945
+
