@@ -68,15 +68,15 @@ def pad_image(image, kernel_size=11):
             ((pad_width, pad_width), (pad_width, pad_width)),
             mode="edge",
         )
-def generate_octaves_pyramid(img, t_c, R_TH, num_octaves=4, intervals= 2):
+def generate_octaves_pyramid(img, contrust_th, ratio_th, num_octaves=4, intervals= 2):
     """
         Description:
             - Generates the gaussian pyramid which consists of several octaves with increasingly blurred images.
 
         Args:
             - img: the image whose features should be extracted.
-            - t_c: the minimum contrust threshold for a stable keypoint
-            - R_TH: the maximum threshold for the ratio of principal curvatures, if the ratio exceeds this threshold that indicates that the 
+            - contrust_th: the minimum contrust threshold for a stable keypoint
+            - ratio_th: the maximum threshold for the ratio of principal curvatures, if the ratio exceeds this threshold that indicates that the 
                 keypoint is an edge, and since that edges can't be keypoints the keypoint is discarded.
             - num_octaves: the number of octaves in the pyramid 
             - intervals: the order of the image that is blurred with 2 sigma in the octave
@@ -99,7 +99,7 @@ def generate_octaves_pyramid(img, t_c, R_TH, num_octaves=4, intervals= 2):
     for octave_index in range(num_octaves):
         # calculate the blurred images of the current octave and the keypoints in the octave and the difference of gaussians which is the subtraction 
         # of each two adjacent gaussian filtered images in the octave
-        gaussian_images_in_octave, DOG_octave,keypoints_per_octave= generate_gaussian_images_in_octave(img, gaussian_kernels, t_c, R_TH)
+        gaussian_images_in_octave, DOG_octave,keypoints_per_octave= generate_gaussian_images_in_octave(img, gaussian_kernels, contrust_th, ratio_th)
         # append the current octave to the pyramid of octaves
         gaussian_images_pyramid.append(gaussian_images_in_octave)
         # append the difference of gaussians images of the current octave to the different of gaussians pyramid
@@ -110,7 +110,7 @@ def generate_octaves_pyramid(img, t_c, R_TH, num_octaves=4, intervals= 2):
         img = gaussian_images_in_octave[-3][::2, ::2]
     return gaussian_images_pyramid, DOG_pyramid, keypoints
 
-def generate_gaussian_images_in_octave(image, gaussian_kernels, t_c, R_th):
+def generate_gaussian_images_in_octave(image, gaussian_kernels, contrust_th, ratio_th):
     """
         Description:
             - Generates the octave's increasingly blurred images.
@@ -118,8 +118,8 @@ def generate_gaussian_images_in_octave(image, gaussian_kernels, t_c, R_th):
         Args:
             - image: the base image for the octave.
             - gaussian_kernels: A numpy array of arrays in which the generated Gaussian kernels are stored.
-            - t_c: the minimum contrust threshold for a stable keypoint
-            - R_TH: the maximum threshold for the ratio of principal curvatures, if the ratio exceeds this threshold that indicates that the 
+            - contrust_th: the minimum contrust threshold for a stable keypoint
+            - ratio_th: the maximum threshold for the ratio of principal curvatures, if the ratio exceeds this threshold that indicates that the 
                 keypoint is an edge, and since that edges can't be keypoints the keypoint is discarded.
 
         Returns:
@@ -147,10 +147,10 @@ def generate_gaussian_images_in_octave(image, gaussian_kernels, t_c, R_th):
         if len(DOG_octave)> 2:
             # from each three difference of gaussians images, detect possible keypoints through extrema detection then applying keypoints localization 
             # and filtering to discarde unstable keypoints 
-            keypoints.extend(get_keypoints(DOG_octave[-3:], len(DOG_octave)-2, t_c, R_th, np.concatenate([o[:,:,np.newaxis] for o in DOG_octave], axis=2)))
+            keypoints.extend(get_keypoints(DOG_octave[-3:], len(DOG_octave)-2, contrust_th, ratio_th, np.concatenate([o[:,:,np.newaxis] for o in DOG_octave], axis=2)))
     return gaussian_images_in_octave, np.concatenate([o[:,:,np.newaxis] for o in DOG_octave], axis=2), keypoints
 
-def get_keypoints(DOG_octave, k, t_c, R_th, DoG_full_array):
+def get_keypoints(DOG_octave, k, contrast_th , ratio_th, DoG_full_array):
     """
         Description:
             - from each three difference of gaussians images, detect possible keypoints through extrema detection which is done by comparing the middle pixel with
@@ -159,8 +159,8 @@ def get_keypoints(DOG_octave, k, t_c, R_th, DoG_full_array):
         Args:
             - DOG_octave: the last three difference of gaussians calculated.
             - k: the depth of the center pixel in the difference of gaussians array.
-            - t_c: the minimum contrust threshold for a stable keypoint
-            - R_TH: the maximum threshold for the ratio of principal curvatures, if the ratio exceeds this threshold that indicates that the 
+            - contrust_th: the minimum contrust threshold for a stable keypoint
+            - ratio_th: the maximum threshold for the ratio of principal curvatures, if the ratio exceeds this threshold that indicates that the 
                 keypoint is an edge, and since that edges can't be keypoints the keypoint is discarded.
 
         Returns:
@@ -170,8 +170,8 @@ def get_keypoints(DOG_octave, k, t_c, R_th, DoG_full_array):
     # stack the last three difference of gaussians along the depth dimention
     DoG= np.concatenate([o[:,:,np.newaxis] for o in DOG_octave], axis=2)
     # loop over the middle image and form a 3*3*3 patch 
-    for i in range(1, DoG.shape[0] - 11): 
-        for j in range(1, DoG.shape[1] - 11): 
+    for i in range(1, DoG.shape[0] - 2): 
+        for j in range(1, DoG.shape[1] - 2): 
             # form a (3*3*3)patch: 3 rows from i-1 to i+1, three columns from j-1 to j+1 and the depth of DoG stack is already three
             patch = DoG[i-1:i+2, j-1:j+2,:] 
             # flatten the 27 values of the patch, get the index of the maximum and minimum values of the flattened array, since the total length is 27
@@ -179,16 +179,16 @@ def get_keypoints(DOG_octave, k, t_c, R_th, DoG_full_array):
             if (np.argmax(patch) == 13 or np.argmin(patch) == 13):
                 # localize the detected keypoint 
                 offset, J, H, x, y, s =localize_keypoint(DoG_full_array, j, i, k ) 
+                if np.max(offset) > 0.5: continue
                 # calculate its contrast 
-                contrast = DoG[y,x,s] + .5*J.dot(offset) 
+                contrast = DoG[y,x,s] + 0.5*J.dot(offset) 
                 # if the contrast is below the threshold move to the next patch
-                if abs(contrast) < t_c: continue 
-                # The eigenvalues of the Hessian matrix are used to check the ratio of principal curvatures. 
-                w, v = np.linalg.eig(H)
-                r = w[1]/w[0] 
-                R = (r+1)**2 / r 
+                if abs(contrast) < contrast_th: continue 
+                tr = H[0][0] + H[1][1]
+                det = H[0][0] * H[1][1] - H[0][1] ** 2
+                r = ( tr ** 2 ) / det
                 # If this ratio is above a certain threshold then the keypoint is an edge therefore skip it and move to the next patch
-                if R > R_th: continue 
+                if r > ratio_th: continue 
                 # add the final offset to the location of the keypoint to get the interpolated estimate for the location of the keypoint.
                 kp = np.array([x, y, s]) + offset
                 # append the keypoint location to the keypoints of the octave 
@@ -202,7 +202,7 @@ def localize_keypoint(D, x, y, s):
                 to the nearby data to determine the interpolated location of the maximum, In SIFT the second-order Taylor expansion of the DoG octave is used 
 
         Args:
-            - D: last three difference of gaussians stacked along the depth dimention
+            - D: difference of gaussians stacked along the depth dimention
             - x: the x coordinate of the keypoint.
             - y: the y coordinate of the keypoint 
             - s: the depth of the keypoint.
@@ -210,7 +210,7 @@ def localize_keypoint(D, x, y, s):
         Returns:
             - offset: the final offset that should be added to the location of the keypoint to get the interpolated estimate for the location of the keypoint
             - J: the first derivatives of D, These derivatives represent the rate of change of difference of gaussians intensity in each direction.
-            - HD[:2,:2]: the second derivatives (Hessian matrix) of the image intensity at the specified point. 
+            - H[:2,:2]: the second derivatives (Hessian matrix) of the image intensity at the specified point. 
                 The Hessian matrix represents the local curvature or second-order rate of change of image intensity.
             - x: the x coordinate of the keypoint after further localization.
             - y: the y coordinate of the keypoint after further localization.
@@ -231,10 +231,10 @@ def localize_keypoint(D, x, y, s):
     dss = D[y,x,s+1]-2*D[y,x,s]+D[y,x,s-1] 
     J = np.array([dx, dy, ds]) 
     # the second derivatives (Hessian matrix) of the image intensity at the specified point. 
-    HD = np.array([ [dxx, dxy, dxs], [dxy, dyy, dys], [dxs, dys, dss]]) 
+    H = np.array([ [dxx, dxy, dxs], [dxy, dyy, dys], [dxs, dys, dss]]) 
     # the final offset that should be added to the location of the keypoint to get the interpolated estimate for the location of the keypoint
-    offset = -np.linalg.inv(HD).dot(J)
-    return offset, J, HD[:2,:2], x, y, s
+    offset = -np.linalg.inv(H).dot(J)
+    return offset, J, H[:2,:2], x, y, s
 
 image= cv2.imread(r'dog.jpg', cv2.IMREAD_GRAYSCALE)
 
