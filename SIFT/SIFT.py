@@ -287,19 +287,6 @@ def convert_to_grayscale(image):
         return np.dot(image[...,:3], [0.2989, 0.5870, 0.1140])
     return image
 
-
-# image, _= sift_resize(np.array(Image.open('img.jpg')))
-# grayscaled_image = convert_to_grayscale(image)    
-# base_image = rescale( grayscaled_image, 2, anti_aliasing=False) 
-# pyramid, DoG, keypoints = generate_octaves_pyramid(base_image)
-
-
-
-# visualize_pyramid(pyramid)
-# visualize_DOC_for_octave(DoG)
-#  visualize_keypoints(pyramid, keypoints) 
-
-
 def represent_keypoints(keypoints, DoG):
     keypoints_as_images = list()
     for octave_ind ,kp_per_octave in enumerate(keypoints):
@@ -500,28 +487,31 @@ def match( img_a, pts_a, desc_a, img_b, pts_b, desc_b, tuning_distance = 0.3 ):
     
     return img_match
 
-    
-n_octaves = 4
-s_value = 2
-sigma_base = 1.6
-constract_th = 0.03
-r_ratio = 10
+
+
+n_octaves = 4 # entry box 
+s_value = 2 # entry box 
+sigma_base = 1.6 # entry box float
+r_ratio = 10 # entry box float
+# -------------
+contrast_th = 0.03 #  slider 
+tuning_factor = 0.3 # slider 
+
 main_image = np.array(Image.open("img.jpg"))
 template = np.array(Image.open("02.jpg"))
-tuning_factor = 0.3 # to control the number of matches
 
-def apply_sift(main_image, template ,n_octaves, s_value, sigma_base, constract_th, r_ratio, tuning_factor):
+def apply_sift(main_image, template ,n_octaves, s_value, sigma_base, contrast_th, r_ratio, tuning_factor): 
 
     main_image, ratio = sift_resize(main_image)
     template, _ = sift_resize(template, ratio)
 
-    img_kp, img_des = computeKeypointsAndDescriptors(main_image, n_octaves, s_value, sigma_base, constract_th, r_ratio)
-    template_kp, template_des  = computeKeypointsAndDescriptors(template, n_octaves, s_value, sigma_base, constract_th, r_ratio)
+    img_kp, img_des = computeKeypointsAndDescriptors(main_image, n_octaves, s_value, sigma_base, contrast_th, r_ratio)
+    template_kp, template_des  = computeKeypointsAndDescriptors(template, n_octaves, s_value, sigma_base, contrast_th, r_ratio)
 
     img_match = match(main_image, img_kp, img_des,template , template_kp, template_des, tuning_factor)
     return  img_match
 
-img_match = apply_sift(main_image, template ,n_octaves, s_value, sigma_base, constract_th, r_ratio, tuning_factor)
+img_match = apply_sift(main_image, template ,n_octaves, s_value, sigma_base, contrast_th, r_ratio, tuning_factor)
 
 plt.figure(figsize=(20,20))
 plt.imshow(img_match)
