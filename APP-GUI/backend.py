@@ -124,7 +124,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.ui.setupUi(self)
 
         ### ==== HARRIS & LAMBDA-MINUS ==== ###
-        self.current_image_RGB = None
+        self.harris_current_image_RGB = None
         self.harris_response_operator = None
         self.eigenvalues = None
         self.change_the_icon()
@@ -134,14 +134,20 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
         # Apply Harris Button
         self.ui.apply_harris_push_button.clicked.connect(
-            lambda: self.on_apply_detectors_clicked(self.current_image_RGB, 0)
+            lambda: self.on_apply_detectors_clicked(self.harris_current_image_RGB, 0)
         )
+        self.ui.apply_harris_push_button.setEnabled(False)
         # Apply Lambda Minus
         self.ui.apply_lambda_minus_push_button.clicked.connect(
-            lambda: self.on_apply_detectors_clicked(self.current_image_RGB, 1)
+            lambda: self.on_apply_detectors_clicked(self.harris_current_image_RGB, 1)
         )
+        self.ui.apply_lambda_minus_push_button.setEnabled(False)
 
         ### ==== SIFT ==== ###
+        # Images
+        self.sift_target_image = None
+        self.sift_template_image = None
+        self.sift_output_image = None
 
         # Default parameters
         self.n_octaves = 4
@@ -149,32 +155,30 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.sigma_base = 1.6
         self.r_ratio = 10
         self.contrast_th = 0.03
-        self.tuning_factor = 0.03
+        self.confusion_factor = 0.3
 
         # Widgets that control the SIFT parameters
-        self.ui.n_octaves_spin_box.valueChanged.connect(self.update_n_octaves)
-        self.ui.s_value_spin_box.valueChanged.connect(self.update_s_Value)
-        self.ui.sigma_base_spin_box.valueChanged.connect(self.update_sigma_base)
-        self.ui.r_ratio_spin_box.valueChanged.connect(self.update_r_ratio)
-        self.ui.contrast_th_slider.valueChanged.connect(self.update_contrast_th)
-        self.ui.tuning_factor_slider.valueChanged.connect(self.update_tuning_factor)
-
+        self.ui.n_octaves_spin_box.valueChanged.connect(self.get_new_SIFT_parameters)
+        self.ui.s_value_spin_box.valueChanged.connect(self.get_new_SIFT_parameters)
+        self.ui.sigma_base_spin_box.valueChanged.connect(self.get_new_SIFT_parameters)
+        self.ui.r_ratio_spin_box.valueChanged.connect(self.get_new_SIFT_parameters)
+        self.ui.contrast_th_slider.valueChanged.connect(self.get_new_SIFT_parameters)
+        self.ui.confusion_factor_slider.valueChanged.connect(
+            self.get_new_SIFT_parameters
+        )
         # Apply SIFT Button
         self.ui.apply_sift.clicked.connect(self.apply_sift)
+        self.ui.apply_sift.setEnabled(False)
 
         ### ==== General ==== ###
         # Connect menu action to load_image
         self.ui.actionLoad_Image.triggered.connect(self.load_image)
 
-        # Create QVBoxLayouts for left_widget_corner_tab and right_widget_corner_tab
-        self.left_layout = QVBoxLayout(self.ui.left_widget_corner_tab)
-        self.right_layout = QVBoxLayout(self.ui.right_widget_corner_tab)
-
     def change_the_icon(self):
         self.setWindowIcon(QtGui.QIcon("App_Icon.png"))
         self.setWindowTitle("Computer Vision - Task 03 - Team 02")
 
-        # def load_image(self, file_path=None, folder=""):
+    def load_image(self):
         # clear self.r and threshold label
         self.ui.threshold_value_label.setText("")
         self.harris_response_operator = None
@@ -184,73 +188,34 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open Image",
-            folder,
+            "Images",
             "Image Files (*.png *.jpg *.jpeg *.bmp *.ppm *.pgm)",
         )
 
-        # Check if file_path is not None and it's a string
         if file_path and isinstance(file_path, str):
             # Read the matrix, convert to rgb
             img = cv2.imread(file_path, 1)
+            img = convert_BGR_to_RGB(img)
 
-            self.current_image_RGB = convert_BGR_to_RGB(img)
-            # Create instance of
-            fig_left = Figure()
-            # Add subplot to the figure, ax
-            ax_left = fig_left.add_subplot(111)
-            # ax.imshow
-            ax_left.imshow(self.current_image_RGB)
-            ax_left.axis("off")  # Turn off axis
-            # Create figure canvas from figure
-            canvas_left = FigureCanvas(fig_left)
-            # Clear existing layouts before adding canvas
-            for i in reversed(range(self.left_layout.count())):
-                self.left_layout.itemAt(i).widget().setParent(None)
-            # Add the canvases to the layouts
-            self.left_layout.addWidget(canvas_left)
-            self.clear_right_image()
-            # Deactivate the slider and disconnect from apply harris function
-            self.ui.horizontalSlider_corner_tab.setEnabled(False)
-            try:
-                self.ui.horizontalSlider_corner_tab.valueChanged.disconnect()
-            except TypeError:
-                pass
+            current_tab = self.ui.tabWidget.currentIndex()
 
-    def load_image(self, file_path=None, folder=""):
-        # clear self.r and threshold label
-        self.ui.threshold_value_label.setText("")
-        self.harris_response_operator = None
-        self.eigenvalues = None
+            if current_tab == 0:
+                self.harris_current_image_RGB = img
+                self.display_image(
+                    self.harris_current_image_RGB,
+                    self.ui.harris_input_figure_canvas,
+                    "Input Image",
+                )
+                self.ui.apply_harris_push_button.setEnabled(True)
+                self.ui.apply_lambda_minus_push_button.setEnabled(True)
+            else:
+                self.display_selection_dialog(img)
+                if (
+                    self.sift_target_image is not None
+                    and self.sift_template_image is not None
+                ):
+                    self.ui.apply_sift.setEnabled(True)
 
-        # Open file dialog if file_path is not provided
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Open Image",
-            folder,
-            "Image Files (*.png *.jpg *.jpeg *.bmp *.ppm *.pgm)",
-        )
-
-        # Check if file_path is not None and it's a string
-        if file_path and isinstance(file_path, str):
-            # Read the matrix, convert to rgb
-            img = cv2.imread(file_path, 1)
-
-            self.current_image_RGB = convert_BGR_to_RGB(img)
-            # Create instance of
-            fig_left = Figure()
-            # Add subplot to the figure, ax
-            ax_left = fig_left.add_subplot(111)
-            # ax.imshow
-            ax_left.imshow(self.current_image_RGB)
-            ax_left.axis("off")  # Turn off axis
-            # Create figure canvas from figure
-            canvas_left = FigureCanvas(fig_left)
-            # Clear existing layouts before adding canvas
-            for i in reversed(range(self.left_layout.count())):
-                self.left_layout.itemAt(i).widget().setParent(None)
-            # Add the canvases to the layouts
-            self.left_layout.addWidget(canvas_left)
-            self.clear_right_image()
             # Deactivate the slider and disconnect from apply harris function
             self.ui.horizontalSlider_corner_tab.setEnabled(False)
             try:
@@ -263,23 +228,21 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         Description:
             - Plots the given (image) in the specified (canvas)
         """
-        canvas.clear()
-        ax = canvas.add_subplot(111)
+        canvas.figure.clear()
+        ax = canvas.figure.add_subplot(111)
         ax.imshow(image)
         ax.axis("off")
         ax.set_title(title)
         canvas.draw()
-        pass
 
     # @staticmethod
-    def display_selection_dialog(self, image, path):
+    def display_selection_dialog(self, image):
         """
         Description:
             - Shows a message dialog box to determine whether this is the a template or the target image in SIFT
 
         Args:
             - image: The image to be displayed.
-            - path: The path of the image.
         """
         msgBox = QMessageBox()
         msgBox.setIcon(QMessageBox.Question)
@@ -298,14 +261,16 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             return
         else:
             if response == QMessageBox.Yes:
+                self.sift_target_image = image
                 self.display_image(image, self.ui.input_1_figure_canvas, "Target Image")
             elif response == QMessageBox.No:
+                self.sift_template_image = image
                 self.display_image(
                     image, self.ui.input_2_figure_canvas, "Template Image"
                 )
 
     def on_apply_detectors_clicked(self, img_RGB, operator):
-        if self.current_image_RGB.any():
+        if self.harris_current_image_RGB.any():
             self.ui.horizontalSlider_corner_tab.valueChanged.connect(
                 lambda value: self.on_changing_threshold(value, img_RGB, operator)
             )
@@ -359,7 +324,11 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     0,
                     0,
                 )  # Highlight detected corners in red
-                self.display_right_image(output_img)
+                self.display_image(
+                    output_img,
+                    self.ui.harris_output_figure_canvas,
+                    "Harris Output Image",
+                )
             elif operator == 1:
                 if np.all(self.eigenvalues != None):
                     # Set the value of the threshold
@@ -377,7 +346,11 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                         cv2.circle(
                             output_img, (j, i), 3, (0, 255, 0), -1
                         )  # Green color
-                    self.display_right_image(output_img)
+                    self.display_image(
+                        output_img,
+                        self.ui.harris_output_figure_canvas,
+                        "Lambda-Minus Output Image",
+                    )
 
         return
 
@@ -388,17 +361,6 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             # Convert image to grayscale
             gray = convert_to_grey(img_RGB)
 
-            # Compute image gradients using prewitt 5x5 operator
-            # K_X = np.array([[-1, -2, 0, 2, 1],
-            #     [-2, -3, 0, 3, 2],
-            #     [-3, -5, 0, 5, 3],
-            #     [-2, -3, 0, 3, 2],
-            #     [-1, -2, 0, 2, 1]])
-
-            # K_Y = K_X.T  # The kernel for vertical edges is the transpose of the kernel for horizontal edges
-
-            # scale_factor = 1
-            # Ix, Iy = scale_factor * convolve2d_optimized(gray, K_X, mode='same'),scale_factor * convolve2d_optimized(gray, K_Y, mode='same')
             Ix, Iy = np.gradient(gray)
             # Compute products of derivatives
             Ixx = Ix**2
@@ -433,7 +395,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 0,
                 255,
             )  # Highlight detected corners in blue
-            self.display_right_image(output_img)
+            self.display_image(
+                output_img, self.ui.harris_output_figure_canvas, "Harris Output Image"
+            )
 
             return (
                 list(zip(corner_list[:, 1], corner_list[:, 0], corner_response)),
@@ -489,32 +453,12 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         # Draw circles at detected corners by unpacking the corner object, drawing at each corner and then restoring its original combact state
         for i, j in zip(*corners):
             cv2.circle(output_image, (j, i), 3, (0, 255, 0), -1)  # Green color
-        self.display_right_image(output_image)
 
-    def display_right_image(self, img_RGB):
-        """
-        img is an RGB matrix
-        """
-        if img_RGB.any() == None:
-            pass
-        else:
-            if self.right_layout.count() > 0:
-                # Get the existing canvas widget
-                canvas_right = self.right_layout.itemAt(0).widget()
-                # Update the figure displayed on the canvas
-                ax_right = canvas_right.figure.axes[0]
-                ax_right.clear()
-                ax_right.imshow(img_RGB)
-                ax_right.axis("off")  # Turn off axis
-                # Redraw the canvas
-                canvas_right.draw()
-            else:
-                fig_right = Figure()
-                ax_right = fig_right.add_subplot(111)
-                ax_right.axis("off")  # Turn off axis
-                ax_right.imshow(img_RGB)
-                canvas_right = FigureCanvas(fig_right)
-                self.right_layout.addWidget(canvas_right)
+        self.display_image(
+            output_image,
+            self.ui.harris_output_figure_canvas,
+            "Lambda-Minus Output Image",
+        )
 
     def clear_right_image(self):
         # Clear existing layouts before adding canvas
@@ -532,8 +476,15 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.s_value = self.ui.s_value_spin_box.value()
         self.sigma_base = self.ui.sigma_base_spin_box.value()
         self.r_ratio = self.ui.r_ratio_spin_box.value()
-        self.contrast_th = self.ui.contrast_th_slider.value()
-        self.tuning_factor = self.ui.tuning_factor_slider.value()
+        self.contrast_th = self.ui.contrast_th_slider.value() / 1000
+        self.confusion_factor = self.ui.confusion_factor_slider.value() / 10
+
+        self.ui.n_octaves.setText(f"n_octaves: {self.n_octaves}")
+        self.ui.s_value.setText(f"s_value: {self.s_value}")
+        self.ui.sigma_base.setText(f"sigma_base: {self.sigma_base}")
+        self.ui.r_ratio.setText(f"r_ratio: {self.r_ratio}")
+        self.ui.contrast_th.setText(f"contrast_th: {self.contrast_th}")
+        self.ui.confusion_factor.setText(f"confusion_factor: {self.confusion_factor}")
 
     def gaussian_filter_kernel(self, sigma, kernel_size=None):
         """
@@ -1043,40 +994,6 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
         return opencv_kp_list
 
-    def draw_matches(self, img1, kp1, img2, kp2, matches, colors, count):
-
-        if len(img1.shape) == 3:
-            new_shape = (
-                max(img1.shape[0], img2.shape[0]),
-                img1.shape[1] + img2.shape[1],
-                img1.shape[2],
-            )
-        elif len(img1.shape) == 2:
-            new_shape = (
-                max(img1.shape[0], img2.shape[0]),
-                img1.shape[1] + img2.shape[1],
-            )
-
-        new_img = np.zeros(new_shape, type(img1.flat[0]))
-        # Place images onto the new image.
-        new_img[0 : img1.shape[0], 0 : img1.shape[1]] = img1
-        new_img[0 : img2.shape[0], img1.shape[1] : img1.shape[1] + img2.shape[1]] = img2
-
-        # Draw lines between matches.  Make sure to offset kp coords in second image appropriately.
-        r = 3
-        thickness = 1
-        for idx in range(min(count, len(matches))):
-            m = matches[idx]
-            # So the keypoint locs are stored as a tuple of floats.  cv2.line(), like most other things,
-            # wants locs as a tuple of ints.
-            end1 = tuple(np.round(kp1[m.queryIdx].pt).astype(int))
-            end2 = tuple(
-                np.round(kp2[m.trainIdx].pt).astype(int) + np.array([img1.shape[1], 0])
-            )
-            cv2.line(new_img, end1, end2, colors[idx], thickness)
-            cv2.circle(new_img, end1, r, colors[idx], thickness)
-            cv2.circle(new_img, end2, r, colors[idx], thickness)
-
     def match(self, img_a, pts_a, desc_a, img_b, pts_b, desc_b, tuning_distance=0.3):
         img_a, img_b = tuple(map(lambda i: np.uint8(i * 255), [img_a, img_b]))
 
@@ -1111,17 +1028,13 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
         return img_match
 
-    def apply_sift(
-        self,
-        main_image,
-        template,
-    ):
+    def apply_sift(self):
         start = time.time()
-        main_image, ratio = self.sift_resize(main_image)
-        template, _ = self.sift_resize(template, ratio)
+        self.sift_target_image, ratio = self.sift_resize(self.sift_target_image)
+        self.sift_template_image, _ = self.sift_resize(self.sift_template_image, ratio)
 
         img_kp, img_des = self.computeKeypointsAndDescriptors(
-            main_image,
+            self.sift_target_image,
             self.n_octaves,
             self.s_value,
             self.sigma_base,
@@ -1129,7 +1042,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             self.r_ratio,
         )
         template_kp, template_des = self.computeKeypointsAndDescriptors(
-            template,
+            self.sift_template_image,
             self.n_octaves,
             self.s_value,
             self.sigma_base,
@@ -1138,19 +1051,21 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         )
 
         img_match = self.match(
-            main_image,
+            self.sift_target_image,
             img_kp,
             img_des,
-            template,
+            self.sift_template_image,
             template_kp,
             template_des,
-            self.tuning_factor,
+            self.confusion_factor,
         )
 
+        self.sift_output_image = img_match
+        self.display_image(img_match, self.ui.sift_output_figure_canvas, "SIFT Output")
+        self.ui.tabWidget.setCurrentIndex(2)
+
         end = time.time()
-        self.ui.sift_elapsed_time.setText(
-            f"This Operation consumed {end-start:.3f} seconds"
-        )
+        self.ui.sift_elapsed_time.setText(f"Elapsed Time is {end-start:.3f} seconds")
         return
 
 
