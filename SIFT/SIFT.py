@@ -1,11 +1,13 @@
 import numpy as np
 from scipy.signal import convolve2d
 import cv2
-from skimage.transform import rescale, resize
+from skimage.transform import rescale, resize, rotate
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle 
 from PIL import Image
 from math import sin, cos
+import time
+
 
 
 
@@ -172,24 +174,26 @@ def get_keypoints(DOG_octave, k, contrast_th , ratio_th, DoG_full_array):
             patch = DoG[i-1:i+2, j-1:j+2,:] 
             # flatten the 27 values of the patch, get the index of the maximum and minimum values of the flattened array, since the total length is 27
             # then the middle pixel index is 13 so if the returned index is 13 then the center pixel is an extrema 
-            if (np.argmax(patch) == 13 or np.argmin(patch) == 13):
-                # # localize the detected keypoint 
-                # # offset, J, H, x, y, s = localize_keypoint(DoG_full_array, j, i, k ) 
+            if (np.argmax(patch) == 13 or np.argmin(patch) == 13): 
+                # localize the detected keypoint 
+                H, x, y, s = localize_keypoint(DoG_full_array, j, i, k) 
                 # if np.max(offset) > 0.5: continue
-                # # calculate its contrast 
+                # calculate its contrast 
                 # contrast = DoG[y,x,s] + 0.5*J.dot(offset) 
-                # # if the contrast is below the threshold move to the next patch
-                # if abs(contrast) < contrast_th: continue 
-                # tr = H[0][0] + H[1][1]
-                # det = H[0][0] * H[1][1] - H[0][1] ** 2
-                # r = ( tr ** 2 ) / det
-                # # If this ratio is above a certain threshold then the keypoint is an edge therefore skip it and move to the next patch
-                # if r > ratio_th: continue 
-                # # add the final offset to the location of the keypoint to get the interpolated estimate for the location of the keypoint.
+                contrast = DoG[y,x,s]
+                # if the contrast is below the threshold move to the next patch
+                if abs(contrast) < contrast_th: continue 
+                tr = H[0][0] + H[1][1]
+                det = H[0][0] * H[1][1] - H[0][1] ** 2
+                r = ( tr ** 2 ) / det
+                # If this ratio is above a certain threshold then the keypoint is an edge therefore skip it and move to the next patch
+                if r > ratio_th: continue 
+                # add the final offset to the location of the keypoint to get the interpolated estimate for the location of the keypoint.
                 # kp = np.array([x, y, s]) + offset
                 # append the keypoint location to the keypoints of the octave 
                 kp = np.array([i,j,k])
                 keypoints.append(kp)
+
     return np.array(keypoints)
 
 def localize_keypoint(D, x, y, s): 
@@ -218,20 +222,22 @@ def localize_keypoint(D, x, y, s):
     #computes the first derivatives (gradient) of the image intensity along the x, y, and scale dimensions at the specified point (x, y, s). 
     dx = (D[y,x+1,s]-D[y,x-1,s])/2. 
     dy = (D[y+1,x,s]-D[y-1,x,s])/2. 
-    ds = (D[y,x,s+1]-D[y,x,s-1])/2. 
+    # ds = (D[y,x,s+1]-D[y,x,s-1])/2. 
     # computes the second derivatives (Hessian matrix) of the image intensity at the keypoint. 
     dxx = D[y,x+1,s]-2*D[y,x,s]+D[y,x-1,s] 
     dxy = ((D[y+1,x+1,s]-D[y+1,x-1,s]) - (D[y-1,x+1,s]-D[y-1,x-1,s]))/4
-    dxs = ((D[y,x+1,s+1]-D[y,x-1,s+1]) - (D[y,x+1,s-1]-D[y,x-1,s-1]))/4 
+    # dxs = ((D[y,x+1,s+1]-D[y,x-1,s+1]) - (D[y,x+1,s-1]-D[y,x-1,s-1]))/4 
     dyy = D[y+1,x,s]-2*D[y,x,s]+D[y-1,x,s] 
-    dys = ((D[y+1,x,s+1]-D[y-1,x,s+1]) - (D[y+1,x,s-1]-D[y-1,x,s-1]))/4
-    dss = D[y,x,s+1]-2*D[y,x,s]+D[y,x,s-1] 
-    J = np.array([dx, dy, ds]) 
+    # dys = ((D[y+1,x,s+1]-D[y-1,x,s+1]) - (D[y+1,x,s-1]-D[y-1,x,s-1]))/4
+    # dss = D[y,x,s+1]-2*D[y,x,s]+D[y,x,s-1] 
+    # J = np.array([dx, dy, ds]) 
     # the second derivatives (Hessian matrix) of the image intensity at the specified point. 
-    H = np.array([ [dxx, dxy, dxs], [dxy, dyy, dys], [dxs, dys, dss]]) 
+    # H = np.array([ [dxx, dxy, dxs], [dxy, dyy, dys], [dxs, dys, dss]]) 
+    H = np.array([ [dxx, dxy], [dxy, dyy]]) 
     # the final offset that should be added to the location of the keypoint to get the interpolated estimate for the location of the keypoint
-    offset = -np.linalg.inv(H).dot(J) # ((3 x 3) . 3 x 1)    
-    return offset, J, H[:2,:2], x, y, s 
+    # offset = -np.linalg.inv(H).dot(J) # ((3 x 3) . 3 x 1)    
+
+    return H, x, y, s 
 
 
 
@@ -277,10 +283,27 @@ def visualize_keypoints(pyramid, keypoints):
     plt.show()
 
 def sift_resize(img, ratio = None):
-    ratio = ratio if ratio is not None else np.sqrt((1024*1024) / np.prod(img.shape[:2]))
+    """
+    Resize an image while maintaining its aspect ratio.
+
+    Parameters:
+    - img (numpy.ndarray): The input image to be resized.
+    - ratio (float, optional): The ratio by which the image should be resized. If None, it is calculated 
+      based on the square root of (1024*1024) divided by the product of the input image's width and height.
+
+    Returns:
+    - resized_img (numpy.ndarray): The resized image.
+    - ratio (float): The ratio used for resizing the image.
+    
+    Notes:
+    - The `resize` function used here resizes the image to the new shape calculated based on the ratio.
+    - `anti_aliasing=True` is used to smooth the edges of the resized image.
+    """
+    ratio = ratio if ratio is not None else np.sqrt((1024*1024) / np.prod(img.shape[:2])) 
     newshape = list(map( lambda d : int(round(d*ratio)), img.shape[:2])) 
     img = resize( img, newshape , anti_aliasing = True )
     return img,ratio
+
 
 def convert_to_grayscale(image):
     if len(image.shape) == 3: 
@@ -288,18 +311,31 @@ def convert_to_grayscale(image):
     return image
 
 def represent_keypoints(keypoints, DoG):
+    """
+    Represent keypoints as boolean images indicating their presence in different levels of the Difference of Gaussian (DoG) pyramid.
+
+    Parameters:
+    - keypoints (list): A list of lists containing keypoints for each octave. Each keypoint is represented as a tuple (x, y, sigma),
+                        where x and y are the coordinates of the keypoint and sigma is the scale at which it was detected.
+    - DoG (list): A list of Difference of Gaussian (DoG) images for each octave. Each octave contains a series of images 
+                  representing the difference between blurred images at different scales.
+
+    Returns:
+    - keypoints_as_images (list): A list of boolean images representing the presence of keypoints at different scales
+                                   within each octave of the DoG pyramid. Each element in the list corresponds to an octave,
+                                   and contains boolean images indicating keypoints detected at different levels of the DoG pyramid.
+    """
     keypoints_as_images = list()
-    for octave_ind ,kp_per_octave in enumerate(keypoints):
+    for octave_ind, kp_per_octave in enumerate(keypoints):
         keypoints_per_octave = list()
-        for dog_idx in range(1, len(DoG)-1):
-            keypoints_per_sigma =  np.full( DoG[octave_ind][0].shape, False, dtype = bool) # create bool 2d array of same size as 
+        for dog_idx in range(1, len(DoG) - 1): # the boundaries are not included
+            keypoints_per_sigma = np.full(DoG[octave_ind][0].shape, False, dtype=bool) # create bool 2d array of same size as DoG image
             for kp in kp_per_octave:
                 if kp[2] == dog_idx: 
-                    keypoints_per_sigma[kp[0],kp[1]] = True
+                    keypoints_per_sigma[kp[0], kp[1]] = True
             keypoints_per_octave.append(keypoints_per_sigma)
         keypoints_as_images.append(keypoints_per_octave)
     return keypoints_as_images
-
 
 
 def sift_gradient(img):
@@ -307,10 +343,26 @@ def sift_gradient(img):
     gx = convolve2d( img , dx , boundary='symm', mode='same' )
     gy = convolve2d( img , dy , boundary='symm', mode='same' )
     magnitude = np.sqrt( gx * gx + gy * gy )
-    direction = np.rad2deg( np.arctan2( gy , gx )) % 360
+    direction = np.rad2deg( np.arctan2( gy , gx )) % 360 # to wrap the direction  
     return gx, gy, magnitude, direction
 
 def padded_slice(img, sl):
+    """
+    Extract a slice from the input image with padding to match the specified output shape.
+
+    Parameters:
+    - img (numpy.ndarray): Input image.
+    - sl (list): List containing slice indices [start_row, end_row, start_column, end_column].
+
+    Returns:
+    - output (numpy.ndarray): Padded slice of the input image based on the specified slice indices.
+
+    Notes:
+    - The function extracts a slice from the input image based on the specified slice indices.
+    - If the slice extends beyond the boundaries of the image, padding is applied to match the specified output shape.
+    - The output shape is determined by the difference between the end and start indices of the slice.
+    - Padding is applied using zero values.
+    """
     output_shape = np.asarray(np.shape(img))
     output_shape[0] = sl[1] - sl[0]
     output_shape[1] = sl[3] - sl[2]
@@ -320,54 +372,78 @@ def padded_slice(img, sl):
            min(sl[3], img.shape[1])]
     dst = [src[0] - sl[0], src[1] - sl[0],
            src[2] - sl[2], src[3] - sl[2]]
-    output = np.zeros(output_shape, dtype=img.dtype)
-    output[dst[0]:dst[1],dst[2]:dst[3]] = img[src[0]:src[1],src[2]:src[3]]
+    output = np.zeros(output_shape, dtype=img.dtype) # padding of zeros if the indices of sl is out of the image boundaries
+    output[dst[0]:dst[1], dst[2]:dst[3]] = img[src[0]:src[1], src[2]:src[3]]
     return output
 
 def dog_keypoints_orientations( img_gaussians , keypoints , sigma_base ,num_bins = 36, s = 2):
+    """Assigns the dominant orientation of the keypoint"""
     kps = []
     for octave_idx in range(len(img_gaussians)): # iterate over the ocataves
         img_octave_gaussians = img_gaussians[octave_idx]
         octave_keypoints = keypoints[octave_idx]
         for idx, scale_keypoints in enumerate(octave_keypoints):
-            scale_idx = idx + 1 ## idx+1 to be replaced by quadratic localization
+            scale_idx = idx + 1 ## This will be adjusted according to the sigma surface resulting from interpolation. (skip for now) 
             gaussian_img = img_octave_gaussians[scale_idx] 
-            sigma = 1.5 * sigma_base * ( 2 ** octave_idx ) * ( (2**(1/s)) ** (scale_idx))
+            sigma = 1.5 * sigma_base * ( 2 ** octave_idx ) * ( (2**(1/s)) ** (scale_idx)) # sigma for smoothing the magnitude accordingly (1.5 recommmended)
 
             kernel = gaussian_filter_kernel(sigma)
             radius = int(round(sigma * 2)) # 2 x std == 95 % 
+
             gx,gy,magnitude,direction = sift_gradient(gaussian_img)
-            direction_idx = np.round( direction * num_bins / 360 ).astype(int)          
+
+            direction_idx = np.round( direction * num_bins / 360 ).astype(int)  # dirction in terms of bins       
             
-            for i,j in map( tuple , np.argwhere( scale_keypoints ).tolist() ):
-                window = [i-radius, i+radius+1, j-radius, j+radius+1]
+            for i,j in map( tuple , np.argwhere( scale_keypoints ).tolist() ): # get the coordinates of the points 
+                window = [i-radius, i+radius+1, j-radius, j+radius+1]  # the indices of the window to be extracted  
                 mag_win = padded_slice( magnitude , window )
                 dir_idx = padded_slice( direction_idx, window )
-                weight = mag_win * kernel 
+                weight = mag_win * kernel # modulate the weights according to the sigma * 1.5 (sigma at which the keypoint is detected)
                 hist = np.zeros(num_bins, dtype=np.float32)
                 
                 for bin_idx in range(num_bins):
-                    hist[bin_idx] = np.sum( weight[ dir_idx == bin_idx ] )
+                    hist[bin_idx] = np.sum( weight[ dir_idx == bin_idx ] ) # histogram is mag weighted
             
-                for bin_idx in np.argwhere( hist >= 0.8 * hist.max() ).tolist():
-                    angle = (bin_idx[0]+0.5) * (360./num_bins) % 360
-                    kps.append( (i,j,octave_idx,scale_idx,angle))
+                for bin_idx in np.argwhere( hist >= 0.8 * hist.max() ).tolist(): #  returns list of lists 
+                    angle = (bin_idx[0]+0.5) * (360./num_bins) % 360 
+                    kps.append((i,j,octave_idx,scale_idx, angle)) # there can be more than one descriptor to the same keypoint (another dominant angle) 
     return kps
 
 
 def rotated_subimage(image, center, theta, width, height):
-    theta *= 3.14159 / 180 # convert to rad
-    
+    """
+    Rotate a subimage around a specified center point by a given angle.
+
+    Parameters:
+    - image (numpy.ndarray): Input image.
+    - center (tuple): Coordinates (x, y) of the center point around which to rotate the subimage.
+    - theta (float): Angle of rotation in degrees.
+    - width (int): Width of the subimage.
+    - height (int): Height of the subimage.
+
+    Returns:
+    - rotated_image (numpy.ndarray): Rotated subimage.
+
+    Notes:
+    - The function rotates the subimage around the specified center point by the given angle.
+    - Rotation angle `theta` is provided in degrees and converted to radians internally for computation.
+    - The function uses an affine transformation to perform the rotation.
+    - Nearest-neighbor interpolation is used (`cv2.INTER_NEAREST`) to avoid interpolation artifacts.
+    - The `cv2.WARP_INVERSE_MAP` flag indicates that the provided transformation matrix is the inverse transformation matrix.
+    - Pixels outside the image boundaries are filled with a constant value (0) using `cv2.BORDER_CONSTANT` border mode.
+    """
+    theta *= 3.14159 / 180  # convert angle to radians
     
     v_x = (cos(theta), sin(theta))
     v_y = (-sin(theta), cos(theta))
     s_x = center[0] - v_x[0] * ((width-1) / 2) - v_y[0] * ((height-1) / 2)
     s_y = center[1] - v_x[1] * ((width-1) / 2) - v_y[1] * ((height-1) / 2)
 
-    mapping = np.array([[v_x[0],v_y[0], s_x],
-                        [v_x[1],v_y[1], s_y]])
+    mapping = np.array([[v_x[0], v_y[0], s_x],
+                        [v_x[1], v_y[1], s_y]])
 
-    return cv2.warpAffine(image,mapping,(width, height),flags=cv2.INTER_NEAREST+cv2.WARP_INVERSE_MAP,borderMode=cv2.BORDER_CONSTANT)
+    return cv2.warpAffine(image, mapping, (width, height), flags=cv2.INTER_NEAREST + cv2.WARP_INVERSE_MAP, borderMode=cv2.BORDER_CONSTANT)
+
 
 def get_gaussian_mask(sigma,filter_size):
     if sigma > 0: 
@@ -376,55 +452,58 @@ def get_gaussian_mask(sigma,filter_size):
     else:
         raise ValueError("Invalid value of Sigma")
 
-def extract_sift_descriptors( img_gaussians, keypoints, base_sigma,num_bins = 8, s = 2):
+def extract_sift_descriptors(img_gaussians, keypoints, base_sigma,num_bins = 8, s = 2):
+    """Extract the 128 length descriptors of each keypoint besides their keypoint info (i ,j , oct_idx, scale_idx, orientation)"""
+
     descriptors = []; points = [];  data = {} # 
     for (i,j,oct_idx,scale_idx, orientation) in keypoints:
 
         if 'index' not in data or data['index'] != (oct_idx,scale_idx):
             data['index'] = (oct_idx,scale_idx)
-            gaussian_img = img_gaussians[oct_idx][ scale_idx ] 
-            sigma = 1.5 * base_sigma * ( 2 ** oct_idx ) * ( (2**(1/s)) ** (scale_idx))
-            data['kernel'] = get_gaussian_mask(sigma = sigma, filter_size = 16)           
+            gaussian_img = img_gaussians[oct_idx][ scale_idx ] # must be editted in case of taylor approximation
+            sigma = 1.5 * base_sigma * ( 2 ** oct_idx ) * ( (2**(1/s)) ** (scale_idx)) # scale invarance introduced to the keypoint (kernel std proportional to sigma of keypoint) 
+            data['kernel'] = get_gaussian_mask(sigma = sigma, filter_size = 16)  # the window size is constant 
 
             gx,gy,magnitude,direction = sift_gradient(gaussian_img)
             data['magnitude'] = magnitude
             data['direction'] = direction
 
-        window_mag = rotated_subimage(data['magnitude'],(j,i), orientation, 16,16)
+        window_mag = rotated_subimage(data['magnitude'],(j,i), orientation, 16,16) # rotation to align with the domianant orientation
         window_mag = window_mag * data['kernel']
         window_dir = rotated_subimage(data['direction'],(j,i), orientation, 16,16)
-        window_dir = (((window_dir - orientation) % 360) * num_bins / 360.).astype(int)
+        window_dir = (((window_dir - orientation) % 360) * num_bins / 360.).astype(int) # subtract the dominant orientation to make it direction invariance   
 
-        features = []
+        features = [] # store the hist of 16 regions concatenated (128)
         for sub_i in range(4):
             for sub_j in range(4):
                 sub_weights = window_mag[sub_i*4:(sub_i+1)*4, sub_j*4:(sub_j+1)*4]
                 sub_dir_idx = window_dir[sub_i*4:(sub_i+1)*4, sub_j*4:(sub_j+1)*4]
                 hist = np.zeros(num_bins, dtype=np.float32)
                 for bin_idx in range(num_bins):
-                    hist[bin_idx] = np.sum( sub_weights[ sub_dir_idx == bin_idx ] )
-                features.extend( hist.tolist())
+                    hist[bin_idx] = np.sum( sub_weights[ sub_dir_idx == bin_idx ])
+                features.extend(hist.tolist())
+        
         features = np.array(features) 
-        features /= (np.linalg.norm(features))
-        np.clip( features , np.finfo(np.float16).eps , 0.2 , out = features )
-        assert features.shape[0] == 128, "features missing!"
-        features /= (np.linalg.norm(features))
-        descriptors.append(features)
-        points.append( (i ,j , oct_idx, scale_idx, orientation))
+        features /= (np.linalg.norm(features)) # normalize 
+        np.clip( features , np.finfo(np.float16).eps , 0.2 , out = features ) # clip to remove non-linear illumnation effect (0.2) as descripted by author  
+        features /= (np.linalg.norm(features)) # renormalize 
+        descriptors.append(features) 
+        points.append((i ,j , oct_idx, scale_idx, orientation))
+
     return points , descriptors
 
 
 def computeKeypointsAndDescriptors(image, n_octaves, s_value, sigma_base, constract_th, r_ratio):
-    grayscaled_image = convert_to_grayscale(image)    
-    base_image = rescale( grayscaled_image, 2, anti_aliasing=False) 
-    pyramid, DoG, keypoints = generate_octaves_pyramid(base_image, n_octaves, s_value, sigma_base, constract_th, r_ratio ) 
-    keypoints = represent_keypoints(keypoints, DoG) 
+    grayscaled_image = convert_to_grayscale(image) # convert to grayscale 
+    base_image = rescale( grayscaled_image, 2, anti_aliasing=False) # upsampling to increase the number of features extracted 
+    pyramid, DoG, keypoints = generate_octaves_pyramid(base_image, n_octaves, s_value, sigma_base, constract_th, r_ratio) 
+    keypoints = represent_keypoints(keypoints, DoG) # represent the keypoints in each (octave, scale) as bool images  
     keypoints_ijso = dog_keypoints_orientations( pyramid , keypoints, sigma_base , 36, s_value )  # ( i ,j , oct_idx, scale_idx, orientation)
-    points,descriptors = extract_sift_descriptors(pyramid , keypoints_ijso, sigma_base, 8, s_value)
+    points, descriptors = extract_sift_descriptors(pyramid , keypoints_ijso, sigma_base, 8, s_value)
     return points,descriptors
 
 def kp_list_2_opencv_kp_list(kp_list):
-
+    """represnet the keypoints as keyPoint objects"""
     opencv_kp_list = []
     for kp in kp_list:
         opencv_kp = cv2.KeyPoint(x=kp[1] * (2**(kp[2]-1)),
@@ -435,32 +514,6 @@ def kp_list_2_opencv_kp_list(kp_list):
         opencv_kp_list += [opencv_kp]
 
     return opencv_kp_list
-
-def draw_matches(img1, kp1, img2, kp2, matches, colors,count): 
-
-    if len(img1.shape) == 3:
-        new_shape = (max(img1.shape[0], img2.shape[0]), img1.shape[1]+img2.shape[1], img1.shape[2])
-    elif len(img1.shape) == 2:
-        new_shape = (max(img1.shape[0], img2.shape[0]), img1.shape[1]+img2.shape[1])
-    
-    new_img = np.zeros(new_shape, type(img1.flat[0]))  
-    # Place images onto the new image.
-    new_img[0:img1.shape[0],0:img1.shape[1]] = img1
-    new_img[0:img2.shape[0],img1.shape[1]:img1.shape[1]+img2.shape[1]] = img2
-    
-    # Draw lines between matches.  Make sure to offset kp coords in second image appropriately.
-    r = 3
-    thickness = 1
-    for idx in range(min(count,len(matches))):
-        m = matches[idx]
-        # So the keypoint locs are stored as a tuple of floats.  cv2.line(), like most other things,
-        # wants locs as a tuple of ints.
-        end1 = tuple(np.round(kp1[m.queryIdx].pt).astype(int))
-        end2 = tuple(np.round(kp2[m.trainIdx].pt).astype(int) + np.array([img1.shape[1], 0]))
-        cv2.line(new_img, end1, end2, colors[idx], thickness)
-        cv2.circle(new_img, end1, r, colors[idx], thickness)
-        cv2.circle(new_img, end2, r, colors[idx], thickness)
-    
 
 
 def match( img_a, pts_a, desc_a, img_b, pts_b, desc_b, tuning_distance = 0.3 ):
@@ -473,14 +526,15 @@ def match( img_a, pts_a, desc_a, img_b, pts_b, desc_b, tuning_distance = 0.3 ):
     pts_b = kp_list_2_opencv_kp_list(pts_b)
 
     bf = cv2.BFMatcher()
-    matches = bf.knnMatch(desc_a,desc_b,k=2)
+    matches = bf.knnMatch(desc_a,desc_b,k=2) # apply nearest neighbour to get the nearest 2 for each descriptor. 
+
     # Apply ratio test
     good = []
     for m,n in matches:
-        if m.distance < tuning_distance * n.distance:
+        if m.distance < tuning_distance * n.distance: # (if evaluate to "false", then there is confusion around this descriptor, so neglect)
             good.append(m)
 
-    img_match = np.empty((max(img_a.shape[0], img_b.shape[0]), img_a.shape[1] + img_b.shape[1], 3), dtype=np.uint8)
+    img_match = np.empty((max(img_a.shape[0], img_b.shape[0]), img_a.shape[1] + img_b.shape[1], 3), dtype=np.uint8) 
 
     cv2.drawMatches(img_a,pts_a,img_b,pts_b,good, outImg = img_match,
                    flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
@@ -489,7 +543,7 @@ def match( img_a, pts_a, desc_a, img_b, pts_b, desc_b, tuning_distance = 0.3 ):
 
 
 
-n_octaves = 4 # entry box 
+n_octaves = 4 # entry box   
 s_value = 2 # entry box 
 sigma_base = 1.6 # entry box float
 r_ratio = 10 # entry box float
@@ -497,8 +551,9 @@ r_ratio = 10 # entry box float
 contrast_th = 0.03 #  slider 
 tuning_factor = 0.3 # slider 
 
-main_image = np.array(Image.open("img.jpg"))
-template = np.array(Image.open("02.jpg"))
+main_image = np.array(Image.open("img3.jpg"))
+template = np.array(Image.open("03.jpg"))
+template = rotate(template, 90)
 
 def apply_sift(main_image, template ,n_octaves, s_value, sigma_base, contrast_th, r_ratio, tuning_factor): 
 
@@ -511,7 +566,12 @@ def apply_sift(main_image, template ,n_octaves, s_value, sigma_base, contrast_th
     img_match = match(main_image, img_kp, img_des,template , template_kp, template_des, tuning_factor)
     return  img_match
 
+start_time = time.time()
 img_match = apply_sift(main_image, template ,n_octaves, s_value, sigma_base, contrast_th, r_ratio, tuning_factor)
+elapsed_time = time.time() - start_time
+
+print("The time taken by the sift algorithm: {:.6f} seconds".format(elapsed_time))
+
 
 plt.figure(figsize=(20,20))
 plt.imshow(img_match)
