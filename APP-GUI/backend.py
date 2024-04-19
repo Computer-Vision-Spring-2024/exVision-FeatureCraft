@@ -357,6 +357,24 @@ class BackendClass(QMainWindow, Ui_MainWindow):
     def apply_harris_detector_vectorized(
         self, img_RGB, window_size=5, k=0.04, threshold=10000
     ):
+        """
+        Apply the Harris corner detection algorithm on an RGB image in a vectorized manner.
+
+        This method detects corners within an image using the Harris corner detection algorithm. It converts the image to grayscale, computes the gradients, and then calculates the second moment matrix. The corner response is determined by the determinant and trace of this matrix, and corners are identified based on a specified threshold.
+
+        Parameters:
+        - img_RGB (numpy.ndarray): The input image in RGB format.
+        - window_size (int, optional): The size of the window used to compute the sums of the second moment matrix. Defaults to 5.
+        - k (float, optional): The sensitivity factor to separate corners from edges, typically between 0.04-0.06. Defaults to 0.04.
+        - threshold (int, optional): The threshold above which a response is considered a corner. Defaults to 10000.
+
+        Returns:
+        - A tuple containing:
+            - A list of tuples with the x-coordinate, y-coordinate, and corner response value for each detected corner.
+            - The output image with detected corners highlighted in blue.
+
+        The method modifies the input image by highlighting detected corners in blue and displays the result using the `display_image` method.
+        """
         if np.all(img_RGB != None):
             # Convert image to grayscale
             gray = convert_to_grey(img_RGB)
@@ -407,6 +425,21 @@ class BackendClass(QMainWindow, Ui_MainWindow):
     def apply_lambda_minus_vectorized(
         self, img_RGB, window_size=5, threshold_percentage=0.01
     ):
+        """
+    Apply the Lambda-Minus corner detection algorithm on an RGB image.
+
+    This method implements a vectorized approach to identify corners within an image using the Lambda-Minus algorithm. It involves converting the image to grayscale, computing gradients, constructing the Hessian matrix, and finding eigenvalues to determine corner points based on a specified threshold.
+
+    Parameters:
+    - img_RGB (numpy.ndarray): The input image in RGB format.
+    - window_size (int, optional): The size of the window used to compute the sum of Hessian matrix elements. Defaults to 5.
+    - threshold_percentage (float, optional): The percentage of the maximum eigenvalue used to set the threshold for corner detection. Defaults to 0.01.
+
+    Returns:
+    - output_image (numpy.ndarray): The RGB image with detected corners marked in green.
+
+    The method modifies the input image by drawing green circles at the detected corner points and displays the result using the `display_image` method.
+    """
 
         # Convert image to grayscale
         gray = convert_to_grey(img_RGB)
