@@ -32,7 +32,9 @@ from PyQt5.QtWidgets import (
 # from scipy.signal import convolve2d
 from scipy.signal import convolve2d
 from skimage.transform import rescale, resize
-from task3_ui import Ui_MainWindow
+
+# from task3_ui import Ui_MainWindow
+from task4_ui import Ui_MainWindow
 
 
 # Helper functions
@@ -170,6 +172,14 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.ui.apply_sift.clicked.connect(self.apply_sift)
         self.ui.apply_sift.setEnabled(False)
 
+        ### ==== Region-Growing ==== ###
+        self.rg_image_input = None
+        self.rg_image_output = None
+        self.rg_threshold = 0.5
+        self.ui.region_growing_input_figure.canvas.mpl_connect(
+            "button_press_event", self.rg_canvas_clicked
+        )
+
         ### ==== General ==== ###
         # Connect menu action to load_image
         self.ui.actionLoad_Image.triggered.connect(self.load_image)
@@ -208,13 +218,26 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 )
                 self.ui.apply_harris_push_button.setEnabled(True)
                 self.ui.apply_lambda_minus_push_button.setEnabled(True)
-            else:
+            elif current_tab == 1:
                 self.display_selection_dialog(img)
                 if (
                     self.sift_target_image is not None
                     and self.sift_template_image is not None
                 ):
                     self.ui.apply_sift.setEnabled(True)
+            elif current_tab == 3:
+                self.rg_image_input = img
+                self.rg_image_output = img
+                self.display_image(
+                    self.rg_image_input,
+                    self.ui.region_growing_input_figure_canvas,
+                    "Input Image",
+                )
+                self.display_image(
+                    self.rg_image_output,
+                    self.ui.region_growing_output_figure_canvas,
+                    "Output Image",
+                )
 
             # Deactivate the slider and disconnect from apply harris function
             self.ui.horizontalSlider_corner_tab.setEnabled(False)
@@ -426,20 +449,20 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self, img_RGB, window_size=5, threshold_percentage=0.01
     ):
         """
-    Apply the Lambda-Minus corner detection algorithm on an RGB image.
+        Apply the Lambda-Minus corner detection algorithm on an RGB image.
 
-    This method implements a vectorized approach to identify corners within an image using the Lambda-Minus algorithm. It involves converting the image to grayscale, computing gradients, constructing the Hessian matrix, and finding eigenvalues to determine corner points based on a specified threshold.
+        This method implements a vectorized approach to identify corners within an image using the Lambda-Minus algorithm. It involves converting the image to grayscale, computing gradients, constructing the Hessian matrix, and finding eigenvalues to determine corner points based on a specified threshold.
 
-    Parameters:
-    - img_RGB (numpy.ndarray): The input image in RGB format.
-    - window_size (int, optional): The size of the window used to compute the sum of Hessian matrix elements. Defaults to 5.
-    - threshold_percentage (float, optional): The percentage of the maximum eigenvalue used to set the threshold for corner detection. Defaults to 0.01.
+        Parameters:
+        - img_RGB (numpy.ndarray): The input image in RGB format.
+        - window_size (int, optional): The size of the window used to compute the sum of Hessian matrix elements. Defaults to 5.
+        - threshold_percentage (float, optional): The percentage of the maximum eigenvalue used to set the threshold for corner detection. Defaults to 0.01.
 
-    Returns:
-    - output_image (numpy.ndarray): The RGB image with detected corners marked in green.
+        Returns:
+        - output_image (numpy.ndarray): The RGB image with detected corners marked in green.
 
-    The method modifies the input image by drawing green circles at the detected corner points and displays the result using the `display_image` method.
-    """
+        The method modifies the input image by drawing green circles at the detected corner points and displays the result using the `display_image` method.
+        """
 
         # Convert image to grayscale
         gray = convert_to_grey(img_RGB)
@@ -822,20 +845,20 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
     def sift_resize(self, img, ratio=None):
         """
-            Resize an image while maintaining its aspect ratio.
+        Resize an image while maintaining its aspect ratio.
 
-            Parameters:
-            - img (numpy.ndarray): The input image to be resized.
-            - ratio (float, optional): The ratio by which the image should be resized. If None, it is calculated 
-            based on the square root of (1024*1024) divided by the product of the input image's width and height.
+        Parameters:
+        - img (numpy.ndarray): The input image to be resized.
+        - ratio (float, optional): The ratio by which the image should be resized. If None, it is calculated
+        based on the square root of (1024*1024) divided by the product of the input image's width and height.
 
-            Returns:
-            - resized_img (numpy.ndarray): The resized image.
-            - ratio (float): The ratio used for resizing the image.
-            
-            Notes:
-            - The `resize` function used here resizes the image to the new shape calculated based on the ratio.
-            - `anti_aliasing=True` is used to smooth the edges of the resized image.
+        Returns:
+        - resized_img (numpy.ndarray): The resized image.
+        - ratio (float): The ratio used for resizing the image.
+
+        Notes:
+        - The `resize` function used here resizes the image to the new shape calculated based on the ratio.
+        - `anti_aliasing=True` is used to smooth the edges of the resized image.
         """
         ratio = (
             ratio
@@ -846,7 +869,6 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         img = resize(img, newshape, anti_aliasing=True)
         return img, ratio
 
-
     def convert_to_grayscale(self, image):
         if len(image.shape) == 3:
             return np.dot(image[..., :3], [0.2989, 0.5870, 0.1140])
@@ -854,18 +876,18 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
     def represent_keypoints(self, keypoints, DoG):
         """
-            Represent keypoints as boolean images indicating their presence in different levels of the Difference of Gaussian (DoG) pyramid.
+        Represent keypoints as boolean images indicating their presence in different levels of the Difference of Gaussian (DoG) pyramid.
 
-            Parameters:
-            - keypoints (list): A list of lists containing keypoints for each octave. Each keypoint is represented as a tuple (x, y, sigma),
-                                where x and y are the coordinates of the keypoint and sigma is the scale at which it was detected.
-            - DoG (list): A list of Difference of Gaussian (DoG) images for each octave. Each octave contains a series of images 
-                        representing the difference between blurred images at different scales.
+        Parameters:
+        - keypoints (list): A list of lists containing keypoints for each octave. Each keypoint is represented as a tuple (x, y, sigma),
+                            where x and y are the coordinates of the keypoint and sigma is the scale at which it was detected.
+        - DoG (list): A list of Difference of Gaussian (DoG) images for each octave. Each octave contains a series of images
+                    representing the difference between blurred images at different scales.
 
-            Returns:
-            - keypoints_as_images (list): A list of boolean images representing the presence of keypoints at different scales
-                                        within each octave of the DoG pyramid. Each element in the list corresponds to an octave,
-                                        and contains boolean images indicating keypoints detected at different levels of the DoG pyramid.
+        Returns:
+        - keypoints_as_images (list): A list of boolean images representing the presence of keypoints at different scales
+                                    within each octave of the DoG pyramid. Each element in the list corresponds to an octave,
+                                    and contains boolean images indicating keypoints detected at different levels of the DoG pyramid.
         """
         keypoints_as_images = list()
         for octave_ind, kp_per_octave in enumerate(keypoints):
@@ -881,32 +903,31 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             keypoints_as_images.append(keypoints_per_octave)
         return keypoints_as_images
 
-
     def sift_gradient(self, img):
         dx = np.array([-1, 0, 1]).reshape((1, 3))
         dy = dx.T
         gx = convolve2d(img, dx, boundary="symm", mode="same")
         gy = convolve2d(img, dy, boundary="symm", mode="same")
         magnitude = np.sqrt(gx * gx + gy * gy)
-        direction = np.rad2deg(np.arctan2(gy, gx)) % 360 # to wrap the direction  
+        direction = np.rad2deg(np.arctan2(gy, gx)) % 360  # to wrap the direction
         return gx, gy, magnitude, direction
 
     def padded_slice(self, img, sl):
         """
-            Extract a slice from the input image with padding to match the specified output shape.
+        Extract a slice from the input image with padding to match the specified output shape.
 
-            Parameters:
-            - img (numpy.ndarray): Input image.
-            - sl (list): List containing slice indices [start_row, end_row, start_column, end_column].
+        Parameters:
+        - img (numpy.ndarray): Input image.
+        - sl (list): List containing slice indices [start_row, end_row, start_column, end_column].
 
-            Returns:
-            - output (numpy.ndarray): Padded slice of the input image based on the specified slice indices.
+        Returns:
+        - output (numpy.ndarray): Padded slice of the input image based on the specified slice indices.
 
-            Notes:
-            - The function extracts a slice from the input image based on the specified slice indices.
-            - If the slice extends beyond the boundaries of the image, padding is applied to match the specified output shape.
-            - The output shape is determined by the difference between the end and start indices of the slice.
-            - Padding is applied using zero values.
+        Notes:
+        - The function extracts a slice from the input image based on the specified slice indices.
+        - If the slice extends beyond the boundaries of the image, padding is applied to match the specified output shape.
+        - The output shape is determined by the difference between the end and start indices of the slice.
+        - Padding is applied using zero values.
         """
         output_shape = np.asarray(np.shape(img))
         output_shape[0] = sl[1] - sl[0]
@@ -918,12 +939,15 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             min(sl[3], img.shape[1]),
         ]
         dst = [src[0] - sl[0], src[1] - sl[0], src[2] - sl[2], src[3] - sl[2]]
-        output = np.zeros(output_shape, dtype=img.dtype) # padding of zeros if the indices of sl is out of the image boundaries
+        output = np.zeros(
+            output_shape, dtype=img.dtype
+        )  # padding of zeros if the indices of sl is out of the image boundaries
         output[dst[0] : dst[1], dst[2] : dst[3]] = img[src[0] : src[1], src[2] : src[3]]
         return output
-    
 
-    def dog_keypoints_orientations(self, img_gaussians, keypoints, sigma_base, num_bins=36, s=2):
+    def dog_keypoints_orientations(
+        self, img_gaussians, keypoints, sigma_base, num_bins=36, s=2
+    ):
         """Assigns the dominant orientation of the keypoint"""
 
         kps = []
@@ -931,55 +955,78 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             img_octave_gaussians = img_gaussians[octave_idx]
             octave_keypoints = keypoints[octave_idx]
             for idx, scale_keypoints in enumerate(octave_keypoints):
-                scale_idx = idx + 1  ## This will be adjusted according to the sigma surface resulting from interpolation. (skip for now) 
+                scale_idx = (
+                    idx + 1
+                )  ## This will be adjusted according to the sigma surface resulting from interpolation. (skip for now)
                 gaussian_img = img_octave_gaussians[scale_idx]
                 sigma = (
-                    1.5 * sigma_base * (2**octave_idx) * ((2 ** (1 / s)) ** (scale_idx)) # sigma for smoothing the magnitude accordingly (1.5 recommmended)
+                    1.5
+                    * sigma_base
+                    * (2**octave_idx)
+                    * (
+                        (2 ** (1 / s)) ** (scale_idx)
+                    )  # sigma for smoothing the magnitude accordingly (1.5 recommmended)
                 )
 
                 kernel = self.gaussian_filter_kernel(sigma)
                 radius = int(round(sigma * 2))  # 2 x std == 95 %
                 gx, gy, magnitude, direction = self.sift_gradient(gaussian_img)
-                direction_idx = np.round(direction * num_bins / 360).astype(int) # dirction in terms of bins 
+                direction_idx = np.round(direction * num_bins / 360).astype(
+                    int
+                )  # dirction in terms of bins
 
-                for i, j in map(tuple, np.argwhere(scale_keypoints).tolist()):  # get the coordinates of the point
-                    window = [i - radius, i + radius + 1, j - radius, j + radius + 1]  # the indices of the window to be extracted  
+                for i, j in map(
+                    tuple, np.argwhere(scale_keypoints).tolist()
+                ):  # get the coordinates of the point
+                    window = [
+                        i - radius,
+                        i + radius + 1,
+                        j - radius,
+                        j + radius + 1,
+                    ]  # the indices of the window to be extracted
                     mag_win = self.padded_slice(magnitude, window)
                     dir_idx = self.padded_slice(direction_idx, window)
-                    weight = mag_win * kernel  # modulate the weights according to the sigma * 1.5 (sigma at which the keypoint is detected)
+                    weight = (
+                        mag_win * kernel
+                    )  # modulate the weights according to the sigma * 1.5 (sigma at which the keypoint is detected)
                     hist = np.zeros(num_bins, dtype=np.float32)
 
                     for bin_idx in range(num_bins):
-                        hist[bin_idx] = np.sum(weight[dir_idx == bin_idx])  # histogram is mag weighted
+                        hist[bin_idx] = np.sum(
+                            weight[dir_idx == bin_idx]
+                        )  # histogram is mag weighted
 
-                    for bin_idx in np.argwhere(hist >= 0.8 * hist.max()).tolist():  #  returns list of lists 
+                    for bin_idx in np.argwhere(
+                        hist >= 0.8 * hist.max()
+                    ).tolist():  #  returns list of lists
                         angle = (bin_idx[0] + 0.5) * (360.0 / num_bins) % 360
-                        kps.append((i, j, octave_idx, scale_idx, angle)) # there can be more than one descriptor to the same keypoint (another dominant angle) 
+                        kps.append(
+                            (i, j, octave_idx, scale_idx, angle)
+                        )  # there can be more than one descriptor to the same keypoint (another dominant angle)
         return kps
 
     def rotated_subimage(self, image, center, theta, width, height):
-
         """
-            Rotate a subimage around a specified center point by a given angle.
+        Rotate a subimage around a specified center point by a given angle.
 
-            Parameters:
-            - image (numpy.ndarray): Input image.
-            - center (tuple): Coordinates (x, y) of the center point around which to rotate the subimage.
-            - theta (float): Angle of rotation in degrees.
-            - width (int): Width of the subimage.
-            - height (int): Height of the subimage.
+        Parameters:
+        - image (numpy.ndarray): Input image.
+        - center (tuple): Coordinates (x, y) of the center point around which to rotate the subimage.
+        - theta (float): Angle of rotation in degrees.
+        - width (int): Width of the subimage.
+        - height (int): Height of the subimage.
 
-            Returns:
-            - rotated_image (numpy.ndarray): Rotated subimage.
+        Returns:
+        - rotated_image (numpy.ndarray): Rotated subimage.
 
-            Notes:
-            - The function rotates the subimage around the specified center point by the given angle.
-            - Rotation angle `theta` is provided in degrees and converted to radians internally for computation.
-            - The function uses an affine transformation to perform the rotation.
-            - Nearest-neighbor interpolation is used (`cv2.INTER_NEAREST`) to avoid interpolation artifacts.
-            - The `cv2.WARP_INVERSE_MAP` flag indicates that the provided transformation matrix is the inverse transformation matrix.
-            - Pixels outside the image boundaries are filled with a constant value (0) using `cv2.BORDER_CONSTANT` border mode.
-         """
+        Notes:
+        - The function rotates the subimage around the specified center point by the given angle.
+        - Rotation angle `theta` is provided in degrees and converted to radians internally for computation.
+        - The function uses an affine transformation to perform the rotation.
+        - Nearest-neighbor interpolation is used (`cv2.INTER_NEAREST`) to avoid interpolation artifacts.
+        - The `cv2.WARP_INVERSE_MAP` flag indicates that the provided transformation matrix is the inverse transformation matrix.
+        - Pixels outside the image boundaries are filled with a constant value (0) using `cv2.BORDER_CONSTANT` border mode.
+        """
         theta *= 3.14159 / 180  # convert to rad
 
         v_x = (cos(theta), sin(theta))
@@ -1026,11 +1073,20 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
             if "index" not in data or data["index"] != (oct_idx, scale_idx):
                 data["index"] = (oct_idx, scale_idx)
-                gaussian_img = img_gaussians[oct_idx][scale_idx] # must be editted in case of taylor approximation
+                gaussian_img = img_gaussians[oct_idx][
+                    scale_idx
+                ]  # must be editted in case of taylor approximation
                 sigma = (
-                    1.5 * base_sigma * (2**oct_idx) * ((2 ** (1 / s)) ** (scale_idx))  # scale invarance introduced to the keypoint (kernel std proportional to sigma of keypoint) 
+                    1.5
+                    * base_sigma
+                    * (2**oct_idx)
+                    * (
+                        (2 ** (1 / s)) ** (scale_idx)
+                    )  # scale invarance introduced to the keypoint (kernel std proportional to sigma of keypoint)
                 )
-                data["kernel"] = self.get_gaussian_mask(sigma=sigma, filter_size=16) # the window size is constant 
+                data["kernel"] = self.get_gaussian_mask(
+                    sigma=sigma, filter_size=16
+                )  # the window size is constant
 
                 gx, gy, magnitude, direction = self.sift_gradient(gaussian_img)
                 data["magnitude"] = magnitude
@@ -1038,14 +1094,14 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
             window_mag = self.rotated_subimage(
                 data["magnitude"], (j, i), orientation, 16, 16
-            ) # rotation to align with the domianant orientation
+            )  # rotation to align with the domianant orientation
             window_mag = window_mag * data["kernel"]
             window_dir = self.rotated_subimage(
                 data["direction"], (j, i), orientation, 16, 16
             )
             window_dir = (((window_dir - orientation) % 360) * num_bins / 360.0).astype(
                 int
-            ) # subtract the dominant orientation to make it direction invariance 
+            )  # subtract the dominant orientation to make it direction invariance
 
             features = []  # store the hist of 16 regions concatenated (128)
             for sub_i in range(4):
@@ -1061,9 +1117,11 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                         hist[bin_idx] = np.sum(sub_weights[sub_dir_idx == bin_idx])
                     features.extend(hist.tolist())
             features = np.array(features)
-            features /= np.linalg.norm(features) # normalize 
-            np.clip(features, np.finfo(np.float16).eps, 0.2, out=features)  # clip to remove non-linear illumnation effect (0.2) as descripted by autho
-            features /= np.linalg.norm(features) # renormalize 
+            features /= np.linalg.norm(features)  # normalize
+            np.clip(
+                features, np.finfo(np.float16).eps, 0.2, out=features
+            )  # clip to remove non-linear illumnation effect (0.2) as descripted by autho
+            features /= np.linalg.norm(features)  # renormalize
             descriptors.append(features)
             points.append((i, j, oct_idx, scale_idx, orientation))
         return points, descriptors
@@ -1071,12 +1129,16 @@ class BackendClass(QMainWindow, Ui_MainWindow):
     def computeKeypointsAndDescriptors(
         self, image, n_octaves, s_value, sigma_base, constract_th, r_ratio
     ):
-        grayscaled_image = self.convert_to_grayscale(image) # convert to grayscale 
-        base_image = rescale(grayscaled_image, 2, anti_aliasing=False) # upsampling to increase the number of features extracted 
+        grayscaled_image = self.convert_to_grayscale(image)  # convert to grayscale
+        base_image = rescale(
+            grayscaled_image, 2, anti_aliasing=False
+        )  # upsampling to increase the number of features extracted
         pyramid, DoG, keypoints = self.generate_octaves_pyramid(
             base_image, n_octaves, s_value, sigma_base, constract_th, r_ratio
         )
-        keypoints = self.represent_keypoints(keypoints, DoG)  # represent the keypoints in each (octave, scale) as bool images  
+        keypoints = self.represent_keypoints(
+            keypoints, DoG
+        )  # represent the keypoints in each (octave, scale) as bool images
         keypoints_ijso = self.dog_keypoints_orientations(
             pyramid, keypoints, sigma_base, 36, s_value
         )  # ( i ,j , oct_idx, scale_idx, orientation)
@@ -1110,11 +1172,15 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         pts_b = self.kp_list_2_opencv_kp_list(pts_b)
 
         bf = cv2.BFMatcher()
-        matches = bf.knnMatch(desc_a, desc_b, k=2) # apply nearest neighbour to get the nearest 2 for each descriptor.
+        matches = bf.knnMatch(
+            desc_a, desc_b, k=2
+        )  # apply nearest neighbour to get the nearest 2 for each descriptor.
         # Apply ratio test
         good = []
         for m, n in matches:
-            if m.distance < tuning_distance * n.distance: # (if evaluate to "false", then there is confusion around this descriptor, so neglect)
+            if (
+                m.distance < tuning_distance * n.distance
+            ):  # (if evaluate to "false", then there is confusion around this descriptor, so neglect)
                 good.append(m)
 
         img_match = np.empty(
@@ -1173,6 +1239,78 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         end = time.time()
         self.ui.sift_elapsed_time.setText(f"Elapsed Time is {end-start:.3f} seconds")
         return
+
+    ## ============== Region-Growing Methods ============== ##
+    def rg_canvas_clicked(event):
+        if event.xdata is not None and event.ydata is not None:
+            x = int(event.xdata)
+            y = int(event.ydata)
+            # print(f"Clicked pixel at ({x}, {y}) with value {image[y, x]}")
+
+    def region_growing(image, seeds, threshold):
+        """
+        Perform region growing segmentation.
+
+        Parameters:
+            image (numpy.ndarray): Input image.
+            seeds (list): List of seed points (x, y).
+            threshold (float): Threshold for similarity measure.
+
+        Returns:
+            numpy.ndarray: Segmented image.
+        """
+        # Initialize visited mask and segmented image
+        visited = np.zeros_like(image, dtype=bool)
+        segmented = np.zeros_like(image)
+
+        # Define 3x3 window for mean calculation
+        window_size = 3
+        half_window = window_size // 2
+
+        # Loop through seed points
+        for seed in seeds:
+            seed_x, seed_y = seed
+
+            # Initialize region mean with seed value
+            region_mean = image[seed_x, seed_y]
+
+            # Initialize region queue with seed point
+            queue = [(seed_x, seed_y)]
+
+            # Region growing loop
+            while queue:
+                # Pop pixel from queue
+                x, y = queue.pop(0)
+
+                # Check if pixel is within image bounds and not visited
+                if (
+                    (0 <= x < image.shape[0])
+                    and (0 <= y < image.shape[1])
+                    and not visited[x, y]
+                ):
+                    # Mark pixel as visited
+                    visited[x, y] = True
+
+                    # Check similarity with region mean
+                    if abs(image[x, y] - region_mean) <= threshold:
+                        # Add pixel to region
+                        segmented[x, y] = 255
+
+                        # Update region mean
+                        region_mean = ((region_mean * len(queue)) + image[x, y]) / (
+                            len(queue) + 1
+                        )
+
+                        # Add neighbors to queue
+                        for i in range(-half_window, half_window + 1):
+                            for j in range(-half_window, half_window + 1):
+                                if (
+                                    0 <= x + i < image.shape[0]
+                                    and 0 <= y + j < image.shape[1]
+                                ):
+                                    queue.append((x + i, y + j))
+
+        return segmented
 
 
 if __name__ == "__main__":
