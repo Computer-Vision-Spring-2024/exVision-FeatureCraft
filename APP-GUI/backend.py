@@ -173,12 +173,21 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.ui.apply_sift.setEnabled(False)
 
         ### ==== Region-Growing ==== ###
-        self.rg_image_input = None
-        self.rg_image_output = None
-        self.rg_threshold = 0.5
+        self.rg_input = None
+        self.rg_input_grayscale = None
+        self.rg_output = None
+        self.rg_seeds = None
+        self.rg_threshold = 20
         self.ui.region_growing_input_figure.canvas.mpl_connect(
             "button_press_event", self.rg_canvas_clicked
         )
+        self.ui.region_growing_threshold_slider.valueChanged.connect(
+            self.update_region_growing_threshold
+        )
+
+        # Apply Region Growing Button
+        self.ui.apply_region_growing.clicked.connect(self.apply_region_growing)
+        self.ui.apply_region_growing.setEnabled(False)
 
         ### ==== General ==== ###
         # Connect menu action to load_image
@@ -226,18 +235,20 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 ):
                     self.ui.apply_sift.setEnabled(True)
             elif current_tab == 3:
-                self.rg_image_input = img
-                self.rg_image_output = img
+                self.rg_input = img
+                self.rg_input_grayscale = convert_to_grey(self.rg_input)
+                self.rg_output = img
                 self.display_image(
-                    self.rg_image_input,
+                    self.rg_input,
                     self.ui.region_growing_input_figure_canvas,
                     "Input Image",
                 )
                 self.display_image(
-                    self.rg_image_output,
+                    self.rg_output,
                     self.ui.region_growing_output_figure_canvas,
                     "Output Image",
                 )
+                self.ui.apply_region_growing.setEnabled(True)
 
             # Deactivate the slider and disconnect from apply harris function
             self.ui.horizontalSlider_corner_tab.setEnabled(False)
@@ -1241,13 +1252,26 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         return
 
     ## ============== Region-Growing Methods ============== ##
-    def rg_canvas_clicked(event):
+    def rg_canvas_clicked(self, event):
         if event.xdata is not None and event.ydata is not None:
             x = int(event.xdata)
             y = int(event.ydata)
-            # print(f"Clicked pixel at ({x}, {y}) with value {image[y, x]}")
+            print(
+                f"Clicked pixel at ({x}, {y}) with value {self.rg_input_grayscale[y, x]}"
+            )
 
-    def region_growing(image, seeds, threshold):
+            # Store the clicked coordinates as seeds
+            if self.rg_seeds is None:
+                self.rg_seeds = [(x, y)]
+            else:
+                self.rg_seeds.append((x, y))
+
+    def update_region_growing_threshold(self):
+        self.rg_threshold = self.ui.region_growing_threshold_slider.value()
+
+        self.ui.region_growing_threshold.setText(f"Threshold: {self.rg_threshold}")
+
+    def apply_region_growing(self):
         """
         Perform region growing segmentation.
 
@@ -1260,19 +1284,19 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             numpy.ndarray: Segmented image.
         """
         # Initialize visited mask and segmented image
-        visited = np.zeros_like(image, dtype=bool)
-        segmented = np.zeros_like(image)
+        visited = np.zeros_like(self.rg_input_grayscale, dtype=bool)
+        segmented = np.zeros_like(self.rg_input)
 
         # Define 3x3 window for mean calculation
         window_size = 3
         half_window = window_size // 2
 
         # Loop through seed points
-        for seed in seeds:
+        for seed in self.rg_seeds:
             seed_x, seed_y = seed
 
             # Initialize region mean with seed value
-            region_mean = image[seed_x, seed_y]
+            region_mean = self.rg_input_grayscale[seed_x, seed_y]
 
             # Initialize region queue with seed point
             queue = [(seed_x, seed_y)]
@@ -1284,33 +1308,49 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
                 # Check if pixel is within image bounds and not visited
                 if (
-                    (0 <= x < image.shape[0])
-                    and (0 <= y < image.shape[1])
+                    (0 <= x < self.rg_input_grayscale.shape[0])
+                    and (0 <= y < self.rg_input_grayscale.shape[1])
                     and not visited[x, y]
                 ):
                     # Mark pixel as visited
                     visited[x, y] = True
 
                     # Check similarity with region mean
-                    if abs(image[x, y] - region_mean) <= threshold:
+                    if (
+                        abs(self.rg_input_grayscale[x, y] - region_mean)
+                        <= self.rg_threshold
+                    ):
                         # Add pixel to region
-                        segmented[x, y] = 255
-
-                        # Update region mean
-                        region_mean = ((region_mean * len(queue)) + image[x, y]) / (
-                            len(queue) + 1
-                        )
+                        segmented[x, y] = self.rg_input[x, y]
 
                         # Add neighbors to queue
                         for i in range(-half_window, half_window + 1):
                             for j in range(-half_window, half_window + 1):
                                 if (
-                                    0 <= x + i < image.shape[0]
-                                    and 0 <= y + j < image.shape[1]
+                                    0 <= x + i < self.rg_input_grayscale.shape[0]
+                                    and 0 <= y + j < self.rg_input_grayscale.shape[1]
                                 ):
                                     queue.append((x + i, y + j))
 
-        return segmented
+        # Find contours of segmented region
+        contours, _ = cv2.findContours(
+            cv2.cvtColor(segmented, cv2.COLOR_RGB2GRAY),
+            cv2.RETR_EXTERNAL,
+            cv2.CHAIN_APPROX_SIMPLE,
+        )
+
+        # Draw contours on input image
+        output_image = self.rg_input.copy()
+        cv2.drawContours(output_image, contours, -1, (255, 0, 0), 2)
+
+        # Display the output image
+        self.display_image(
+            output_image,
+            self.ui.region_growing_output_figure_canvas,
+            "Region Growing Output",
+        )
+
+        return output_image
 
 
 if __name__ == "__main__":

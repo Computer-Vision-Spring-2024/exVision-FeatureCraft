@@ -259,11 +259,15 @@ class Ui_MainWindow(object):
         self.region_growing_threshold_slider.setObjectName(
             "region_growing_threshold_slider"
         )
+        self.region_growing_threshold_slider.setValue(20)
+        self.region_growing_threshold_slider.setSingleStep(1)
+        self.region_growing_threshold_slider.setMinimum(1)
+        self.region_growing_threshold_slider.setMaximum(100)
         self.horizontalLayout_16.addWidget(self.region_growing_threshold_slider)
         self.horizontalLayout_15.addLayout(self.horizontalLayout_16)
-        self.pushButton_2 = QtWidgets.QPushButton(self.tab_4)
-        self.pushButton_2.setObjectName("pushButton_2")
-        self.horizontalLayout_15.addWidget(self.pushButton_2)
+        self.apply_region_growing = QtWidgets.QPushButton(self.tab_4)
+        self.apply_region_growing.setObjectName("apply_region_growing")
+        self.horizontalLayout_15.addWidget(self.apply_region_growing)
         self.verticalLayout_5.addLayout(self.horizontalLayout_15)
         self.tabWidget.addTab(self.tab_4, "")
         self.verticalLayout_2.addWidget(self.tabWidget)
@@ -377,8 +381,10 @@ class Ui_MainWindow(object):
         self.tabWidget.setTabText(
             self.tabWidget.indexOf(self.tab_3), _translate("MainWindow", "SIFT Output")
         )
-        self.region_growing_threshold.setText(_translate("MainWindow", "Threshold"))
-        self.pushButton_2.setText(_translate("MainWindow", "Apply Region Growing"))
+        self.region_growing_threshold.setText(_translate("MainWindow", "Threshold: 20"))
+        self.apply_region_growing.setText(
+            _translate("MainWindow", "Apply Region Growing")
+        )
         self.tabWidget.setTabText(
             self.tabWidget.indexOf(self.tab_4),
             _translate("MainWindow", "Region Growing"),
