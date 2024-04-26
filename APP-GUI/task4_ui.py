@@ -254,8 +254,8 @@ class Ui_MainWindow(object):
         self.region_growing_threshold = QtWidgets.QLabel(self.tab_4)
         self.region_growing_threshold.setObjectName("region_growing_threshold")
         self.horizontalLayout_16.addWidget(self.region_growing_threshold)
-        self.region_growing_threshold_slider = QtWidgets.QSlider(self.tab_4)
-        self.region_growing_threshold_slider.setOrientation(QtCore.Qt.Horizontal)
+        self.region_growing_threshold_slider = QtWidgets.QDoubleSpinBox(self.tab_4)
+        # self.region_growing_threshold_slider.setOrientation(QtCore.Qt.Horizontal)
         self.region_growing_threshold_slider.setObjectName(
             "region_growing_threshold_slider"
         )
@@ -265,8 +265,11 @@ class Ui_MainWindow(object):
         self.region_growing_threshold_slider.setMaximum(100)
         self.horizontalLayout_16.addWidget(self.region_growing_threshold_slider)
         self.horizontalLayout_15.addLayout(self.horizontalLayout_16)
+        self.reset_region_growing = QtWidgets.QPushButton(self.tab_4)
+        self.reset_region_growing.setObjectName("Reset")
         self.apply_region_growing = QtWidgets.QPushButton(self.tab_4)
         self.apply_region_growing.setObjectName("apply_region_growing")
+        self.horizontalLayout_15.addWidget(self.reset_region_growing)
         self.horizontalLayout_15.addWidget(self.apply_region_growing)
         self.verticalLayout_5.addLayout(self.horizontalLayout_15)
         self.tabWidget.addTab(self.tab_4, "")
@@ -349,7 +352,7 @@ class Ui_MainWindow(object):
         ## End of Region Growing canvas
 
         self.retranslateUi(MainWindow)
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(3)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
@@ -385,6 +388,7 @@ class Ui_MainWindow(object):
         self.apply_region_growing.setText(
             _translate("MainWindow", "Apply Region Growing")
         )
+        self.reset_region_growing.setText(_translate("MainWindow", "Reset"))
         self.tabWidget.setTabText(
             self.tabWidget.indexOf(self.tab_4),
             _translate("MainWindow", "Region Growing"),

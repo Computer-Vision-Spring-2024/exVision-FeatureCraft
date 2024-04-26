@@ -185,9 +185,11 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             self.update_region_growing_threshold
         )
 
-        # Apply Region Growing Button
+        # Region Growing Buttons
         self.ui.apply_region_growing.clicked.connect(self.apply_region_growing)
         self.ui.apply_region_growing.setEnabled(False)
+        self.ui.reset_region_growing.clicked.connect(self.reset_region_growing)
+        self.ui.reset_region_growing.setEnabled(False)
 
         ### ==== General ==== ###
         # Connect menu action to load_image
@@ -249,6 +251,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     "Output Image",
                 )
                 self.ui.apply_region_growing.setEnabled(True)
+                self.ui.reset_region_growing.setEnabled(True)
 
             # Deactivate the slider and disconnect from apply harris function
             self.ui.horizontalSlider_corner_tab.setEnabled(False)
@@ -1260,6 +1263,13 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 f"Clicked pixel at ({x}, {y}) with value {self.rg_input_grayscale[y, x]}"
             )
 
+            # Plot a dot at the clicked location
+            ax = self.ui.region_growing_input_figure_canvas.figure.gca()
+            ax.scatter(
+                x, y, color="red", s=50
+            )  # Customize the color and size as needed
+            self.ui.region_growing_input_figure_canvas.draw()
+
             # Store the clicked coordinates as seeds
             if self.rg_seeds is None:
                 self.rg_seeds = [(x, y)]
@@ -1284,7 +1294,11 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             numpy.ndarray: Segmented image.
         """
         # Initialize visited mask and segmented image
+
+        # 'visited' is initialized to keep track of which pixels have been visited (Mask)
         visited = np.zeros_like(self.rg_input_grayscale, dtype=bool)
+        # 'segmented' will store the segmented image where each pixel belonging
+        # to a region will be marked with the corresponding color
         segmented = np.zeros_like(self.rg_input)
 
         # Define 3x3 window for mean calculation
@@ -1299,9 +1313,12 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             region_mean = self.rg_input_grayscale[seed_x, seed_y]
 
             # Initialize region queue with seed point
+            # It holds the candidate pixels
             queue = [(seed_x, seed_y)]
 
             # Region growing loop
+            # - Breadth-First Search (BFS) is used here to ensure
+            # that all similar pixels are added to the region
             while queue:
                 # Pop pixel from queue
                 x, y = queue.pop(0)
@@ -1332,9 +1349,14 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                                 ):
                                     queue.append((x + i, y + j))
 
+        self.plot_rg_output(segmented)
+        # self.display_image(segmented, self.ui.sift_output_figure_canvas, "SIFT Output")
+
+    def plot_rg_output(self, segmented_image):
+        ## =========== Display the segmented image =========== ##
         # Find contours of segmented region
         contours, _ = cv2.findContours(
-            cv2.cvtColor(segmented, cv2.COLOR_RGB2GRAY),
+            cv2.cvtColor(segmented_image, cv2.COLOR_RGB2GRAY),
             cv2.RETR_EXTERNAL,
             cv2.CHAIN_APPROX_SIMPLE,
         )
@@ -1350,7 +1372,20 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             "Region Growing Output",
         )
 
-        return output_image
+    def reset_region_growing(self):
+        self.rg_seeds = None
+        self.rg_threshold = 20
+        self.ui.region_growing_threshold_slider.setValue(self.rg_threshold)
+        self.ui.region_growing_threshold.setText(f"Threshold: {self.rg_threshold}")
+        self.rg_output = self.rg_input
+        self.display_image(
+            self.rg_input, self.ui.region_growing_input_figure_canvas, "Input Image"
+        )
+        self.display_image(
+            self.rg_output,
+            self.ui.region_growing_output_figure_canvas,
+            "Region Growing Output",
+        )
 
 
 if __name__ == "__main__":
