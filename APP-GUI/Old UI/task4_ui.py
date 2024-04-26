@@ -273,33 +273,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout_15.addWidget(self.apply_region_growing)
         self.verticalLayout_5.addLayout(self.horizontalLayout_15)
         self.tabWidget.addTab(self.tab_4, "")
-        self.tab_5 = QtWidgets.QWidget()
-        self.tab_5.setObjectName("tab_5")
-        self.verticalLayout_6 = QtWidgets.QVBoxLayout(self.tab_5)
-        self.verticalLayout_6.setObjectName("verticalLayout_6")
-        self.horizontalLayout_18 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_18.setObjectName("horizontalLayout_18")
-        self.agglomerative_input = QtWidgets.QFrame(self.tab_5)
-        self.agglomerative_input.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.agglomerative_input.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.agglomerative_input.setObjectName("frame")
-        self.horizontalLayout_18.addWidget(self.agglomerative_input)
-        self.agglomerative_output = QtWidgets.QFrame(self.tab_5)
-        self.agglomerative_output.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        self.agglomerative_output.setFrameShadow(QtWidgets.QFrame.Raised)
-        self.agglomerative_output.setObjectName("frame_2")
-        self.horizontalLayout_18.addWidget(self.agglomerative_output)
-        self.verticalLayout_6.addLayout(self.horizontalLayout_18)
-        self.horizontalLayout_19 = QtWidgets.QHBoxLayout()
-        self.horizontalLayout_19.setObjectName("horizontalLayout_19")
-        self.reset_agglomerative = QtWidgets.QPushButton(self.tab_5)
-        self.reset_agglomerative.setObjectName("reset_agglomerative")
-        self.horizontalLayout_19.addWidget(self.reset_agglomerative)
-        self.apply_agglomerative = QtWidgets.QPushButton(self.tab_5)
-        self.apply_agglomerative.setObjectName("apply_agglomerative")
-        self.horizontalLayout_19.addWidget(self.apply_agglomerative)
-        self.verticalLayout_6.addLayout(self.horizontalLayout_19)
-        self.tabWidget.addTab(self.tab_5, "")
+
         self.verticalLayout_2.addWidget(self.tabWidget)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
@@ -379,32 +353,6 @@ class Ui_MainWindow(object):
         )
         ## End of Region Growing canvas
 
-        ## Agglomerative Inpput
-        self.agglomerative_input_vlayout = QtWidgets.QVBoxLayout(
-            self.agglomerative_input
-        )
-        self.agglomerative_input_vlayout.setObjectName("agglomerative_input_vlayout")
-        self.agglomerative_input_figure = plt.figure()
-        self.agglomerative_input_figure_canvas = FigureCanvas(
-            self.agglomerative_input_figure
-        )
-        self.agglomerative_input_vlayout.addWidget(
-            self.agglomerative_input_figure_canvas
-        )
-        ## Agglomerative Output
-        self.agglomerative_output_vlayout = QtWidgets.QVBoxLayout(
-            self.agglomerative_output
-        )
-        self.agglomerative_output_vlayout.setObjectName("agglomerative_output_vlayout")
-        self.agglomerative_output_figure = plt.figure()
-        self.agglomerative_output_figure_canvas = FigureCanvas(
-            self.agglomerative_output_figure
-        )
-        self.agglomerative_output_vlayout.addWidget(
-            self.agglomerative_output_figure_canvas
-        )
-        ## End of Agglomerative Canvas
-
         self.retranslateUi(MainWindow)
         self.tabWidget.setCurrentIndex(3)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
@@ -446,16 +394,6 @@ class Ui_MainWindow(object):
         self.tabWidget.setTabText(
             self.tabWidget.indexOf(self.tab_4),
             _translate("MainWindow", "Region Growing"),
-        )
-        self.reset_agglomerative.setText(
-            _translate("MainWindow", "Reset Agglomerative")
-        )
-        self.apply_agglomerative.setText(
-            _translate("MainWindow", "Apply Agglomerative Clustering")
-        )
-        self.tabWidget.setTabText(
-            self.tabWidget.indexOf(self.tab_5),
-            _translate("MainWindow", "Agglomerative Clustering"),
         )
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.actionLoad_Image.setText(_translate("MainWindow", "Load Image"))
