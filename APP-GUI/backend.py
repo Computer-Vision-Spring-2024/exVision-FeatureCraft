@@ -1,5 +1,6 @@
 # backend.py
 import os
+import random
 
 # To prevent conflicts with pyqt6
 os.environ["QT_API"] = "PyQt5"
@@ -119,6 +120,17 @@ def convolve2d_optimized(input_matrix, convolution_kernel, mode="same"):
     return output_matrix
 
 
+def generate_random_color():
+    """
+    Description:
+        -   Generate a random color for the seeds and their corresponding region in the region-growing segmentation.
+    """
+    r = random.randint(0, 255)
+    g = random.randint(0, 255)
+    b = random.randint(0, 255)
+    return (r, g, b)
+
+
 class BackendClass(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
@@ -191,6 +203,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.ui.reset_region_growing.clicked.connect(self.reset_region_growing)
         self.ui.reset_region_growing.setEnabled(False)
 
+        ### ==== Agglomerative Clustering ==== ###
+        self.agg_input_image = None
+
         ### ==== General ==== ###
         # Connect menu action to load_image
         self.ui.actionLoad_Image.triggered.connect(self.load_image)
@@ -252,6 +267,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 )
                 self.ui.apply_region_growing.setEnabled(True)
                 self.ui.reset_region_growing.setEnabled(True)
+            elif current_tab == 4:
+                self.agg_input_image = img
+                self.display_image(self.agg_input_image, self.ui.agglomerative_input_figure_canvas, "Input Image")
 
             # Deactivate the slider and disconnect from apply harris function
             self.ui.horizontalSlider_corner_tab.setEnabled(False)
@@ -270,6 +288,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         ax.imshow(image)
         ax.axis("off")
         ax.set_title(title)
+        canvas.figure.subplots_adjust(
+            left=0, right=1, bottom=0.05, top=0.95
+        )
         canvas.draw()
 
     # @staticmethod
@@ -306,6 +327,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     image, self.ui.input_2_figure_canvas, "Template Image"
                 )
 
+    ## ============== Harris & Lambda-Minus Methods ============== ##
     def on_apply_detectors_clicked(self, img_RGB, operator):
         if self.harris_current_image_RGB.any():
             self.ui.horizontalSlider_corner_tab.valueChanged.connect(
@@ -1266,7 +1288,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             # Plot a dot at the clicked location
             ax = self.ui.region_growing_input_figure_canvas.figure.gca()
             ax.scatter(
-                x, y, color="red", s=50
+                x, y, color="red", s=10
             )  # Customize the color and size as needed
             self.ui.region_growing_input_figure_canvas.draw()
 
@@ -1278,7 +1300,6 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
     def update_region_growing_threshold(self):
         self.rg_threshold = self.ui.region_growing_threshold_slider.value()
-
         self.ui.region_growing_threshold.setText(f"Threshold: {self.rg_threshold}")
 
     def apply_region_growing(self):
@@ -1309,8 +1330,13 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         for seed in self.rg_seeds:
             seed_x, seed_y = seed
 
-            # Initialize region mean with seed value
-            region_mean = self.rg_input_grayscale[seed_x, seed_y]
+            # Check if seed coordinates are within image bounds
+            if (
+                0 <= seed_x < self.rg_input_grayscale.shape[0]
+                and 0 <= seed_y < self.rg_input_grayscale.shape[1]
+            ):
+                # Process the seed point
+                region_mean = self.rg_input_grayscale[seed_x, seed_y]
 
             # Initialize region queue with seed point
             # It holds the candidate pixels
