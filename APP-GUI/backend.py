@@ -40,13 +40,60 @@ from task4_ui import Ui_MainWindow
 
 # Helper functions
 def convert_to_grey(img_RGB: np.ndarray) -> np.ndarray:
-    grey = np.dot(img_RGB[..., :3], [0.2989, 0.5870, 0.1140])
-    return grey
+    if len(img_RGB.shape) == 3:
+        grey = np.dot(img_RGB[..., :3], [0.2989, 0.5870, 0.1140])
+        return grey
+    else:
+        return img_RGB
 
 
 def convert_BGR_to_RGB(img_BGR_nd_arr: np.ndarray) -> np.ndarray:
     img_RGB_nd_arr = img_BGR_nd_arr[..., ::-1]
     return img_RGB_nd_arr
+
+
+def rgb_to_xyz(rgb):
+    """Convert RGB color values to XYZ color values."""
+    R, G, B = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    X = 0.412453 * R + 0.35758 * G + 0.180423 * B
+    Y = 0.212671 * R + 0.71516 * G + 0.072169 * B
+    Z = 0.019334 * R + 0.119193 * G + 0.950227 * B
+    return np.stack((X, Y, Z), axis=-1)
+
+
+def xyz_to_luv(xyz):
+    X, Y, Z = xyz[..., 0], xyz[..., 1], xyz[..., 2]
+    constant = 903.3
+    un = 0.19793943
+    vn = 0.46832096
+
+    epsilon = 1e-12  # to prevent division by zero
+    u_prime = 4 * X / (X + 15 * Y + 3 * Z + epsilon)
+    v_prime = 9 * Y / (X + 15 * Y + 3 * Z + epsilon)
+
+    L = np.where(Y > 0.008856, 116 * Y ** (1 / 3) - 16, constant * Y)
+    U = 13 * L * (u_prime - un)
+    V = 13 * L * (v_prime - vn)
+
+    return np.stack((L, U, V), axis=-1)
+
+
+def scale_luv_8_bits(luv_image):
+    L, U, V = luv_image[..., 0], luv_image[..., 1], luv_image[..., 2]
+
+    scaled_L = L * (255 / 100)
+    scaled_U = (U + 134) * (255 / 354)
+    scaled_V = (V + 140) * (255 / 262)
+
+    return np.stack((L, U, V), axis=-1)
+
+
+def anti_aliasing_resize(img):
+    """This function can be used for resizing images of huge size to optimize the segmentation algorithm"""
+    ratio = min(1, np.sqrt((512 * 512) / np.prod(img.shape[:2])))
+    newshape = list(map(lambda d: int(round(d * ratio)), img.shape[:2]))
+    img = resize(img, newshape, anti_aliasing=True)
+    return img
 
 
 def padding_matrix(matrix, width, height, pad_size):
@@ -118,6 +165,11 @@ def convolve2d_optimized(input_matrix, convolution_kernel, mode="same"):
     output_matrix = np.sum(convolution_regions * convolution_kernel, axis=(2, 3))
 
     return output_matrix
+
+
+def gaussian_weight(distance, sigma):
+    """Introduce guassian weighting based on the distance from the mean"""
+    return np.exp(-(distance**2) / (2 * sigma**2))
 
 
 def generate_random_color():
@@ -206,6 +258,36 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         ### ==== Agglomerative Clustering ==== ###
         self.agg_input_image = None
 
+        ### ==== K_Means ==== ###
+        self.k_means_input = None
+        self.k_means_luv_input = None
+        self.k_means_output = None
+        self.n_clusters = 4
+        self.max_iterations = 4
+        self.spatial_segmentation = False
+        self.ui.spatial_segmentation_weight_spinbox.setEnabled(False)
+        self.spatial_segmentation_weight = 1
+        self.centroid_optimization = True
+        self.k_means_LUV = False
+
+        # K_Means Buttons
+        self.ui.apply_k_means.clicked.connect(self.apply_k_means)
+        self.ui.spatial_segmentation.stateChanged.connect(
+            self.enable_spatial_segmentation
+        )
+
+        ### ==== Mean-Shift ==== ###
+        self.mean_shift_input = None
+        self.mean_shift_luv_input = None
+        self.mean_shift_output = None
+        self.mean_shift_window_size = 200
+        self.mean_shift_sigma = 20
+        self.mean_shift_threshold = 10
+        self.mean_shift_luv = False
+
+        # Mean-Shift Buttons
+        self.ui.apply_mean_shift.clicked.connect(self.apply_mean_shift)
+
         ### ==== General ==== ###
         # Connect menu action to load_image
         self.ui.actionLoad_Image.triggered.connect(self.load_image)
@@ -269,7 +351,44 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 self.ui.reset_region_growing.setEnabled(True)
             elif current_tab == 4:
                 self.agg_input_image = img
-                self.display_image(self.agg_input_image, self.ui.agglomerative_input_figure_canvas, "Input Image")
+                self.display_image(
+                    self.agg_input_image,
+                    self.ui.agglomerative_input_figure_canvas,
+                    "Input Image",
+                )
+            elif current_tab == 5:
+                self.k_means_luv_input = self.map_rgb_luv(img)
+                self.k_means_input = img
+
+                if self.ui.k_means_LUV_conversion.isChecked():
+                    self.display_image(
+                        self.k_means_luv_input,
+                        self.ui.k_means_input_figure_canvas,
+                        "Input Image",
+                    )
+                else:
+                    self.display_image(
+                        self.k_means_input,
+                        self.ui.k_means_input_figure_canvas,
+                        "Input Image",
+                    )
+
+            elif current_tab == 6:
+                self.mean_shift_luv_input = self.map_rgb_luv(img)
+                self.mean_shift_input = img
+
+                if self.ui.mean_shift_LUV_conversion.isChecked():
+                    self.display_image(
+                        self.mean_shift_luv_input,
+                        self.ui.mean_shift_input_figure_canvas,
+                        "Input Image",
+                    )
+                else:
+                    self.display_image(
+                        self.mean_shift_input,
+                        self.ui.mean_shift_input_figure_canvas,
+                        "Input Image",
+                    )
 
             # Deactivate the slider and disconnect from apply harris function
             self.ui.horizontalSlider_corner_tab.setEnabled(False)
@@ -288,9 +407,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         ax.imshow(image)
         ax.axis("off")
         ax.set_title(title)
-        canvas.figure.subplots_adjust(
-            left=0, right=1, bottom=0.05, top=0.95
-        )
+        canvas.figure.subplots_adjust(left=0, right=1, bottom=0.05, top=0.95)
         canvas.draw()
 
     # @staticmethod
@@ -326,6 +443,20 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 self.display_image(
                     image, self.ui.input_2_figure_canvas, "Template Image"
                 )
+
+    ## ================ Conver to LUV colorspace ================ ##
+    def map_rgb_luv(self, image):
+        image = anti_aliasing_resize(image)
+        normalized_image = (image - image.min()) / (
+            image.max() - image.min()
+        )  # nomalize before
+        xyz_image = rgb_to_xyz(normalized_image)
+        luv_image = xyz_to_luv(xyz_image)
+        luv_image_normalized = (luv_image - luv_image.min()) / (
+            luv_image.max() - luv_image.min()
+        )  # normalize after  (point of question !!)
+        # scaled_image = scale_luv_8_bits(luv_image)
+        return luv_image_normalized
 
     ## ============== Harris & Lambda-Minus Methods ============== ##
     def on_apply_detectors_clicked(self, img_RGB, operator):
@@ -1411,6 +1542,339 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             self.rg_output,
             self.ui.region_growing_output_figure_canvas,
             "Region Growing Output",
+        )
+
+    ## ============== K-Means Methods ============== ##
+    def get_new_k_means_parameters(self):
+        self.n_clusters = self.ui.n_clusters_spinBox.value()
+        self.max_iterations = self.ui.k_means_max_iteratation_spinBox.value()
+        self.centroid_optimization = self.ui.centroid_optimization.isChecked()
+
+        self.spatial_segmentation_weight = (
+            self.ui.spatial_segmentation_weight_spinbox.value()
+        )
+
+        self.spatial_segmentation = self.ui.spatial_segmentation.isChecked()
+        self.k_means_LUV = self.ui.k_means_LUV_conversion.isChecked()
+
+    def enable_spatial_segmentation(self):
+        if self.ui.spatial_segmentation.isChecked():
+            self.spatial_segmentation = True
+            self.ui.spatial_segmentation_weight_spinbox.setEnabled(True)
+        else:
+            self.spatial_segmentation = False
+            self.ui.spatial_segmentation_weight_spinbox.setEnabled(False)
+
+    def kmeans_segmentation(
+        self,
+        image,
+        max_iterations,
+        centroids_color=None,
+        centroids_spatial=None,
+    ):
+        """
+        Perform K-means clustering segmentation on an input image.
+
+        Parameters:
+        - centroids_color (numpy.ndarray, optional): Initial centroids in terms of color. Default is None.
+        - centroids_spatial (numpy.ndarray, optional): Initial centroids in terms of spatial coordinates. Default is None.
+
+        Returns:
+        If include_spatial_seg is False:
+        - centroids_color (numpy.ndarray): Final centroids in terms of color.
+        - labels (numpy.ndarray): Labels of each pixel indicating which cluster it belongs to.
+
+        If include_spatial_seg is True:
+        - centroids_color (numpy.ndarray): Final centroids in terms of color.
+        - centroids_spatial (numpy.ndarray): Final centroids in terms of spatial coordinates.
+        - labels (numpy.ndarray): Labels of each pixel indicating which cluster it belongs to.
+        """
+        img = np.array(image, copy=True, dtype=float)
+
+        if self.spatial_segmentation:
+            h, w, _ = img.shape
+            x_coords, y_coords = np.meshgrid(np.arange(w), np.arange(h))
+            xy_coords = np.column_stack(
+                (x_coords.flatten(), y_coords.flatten())
+            )  # spatial coordinates in the features space
+
+        img_as_features = img.reshape(-1, img.shape[2])  # without spatial info included
+
+        labels = np.zeros(
+            (img_as_features.shape[0], 1)
+        )  # (image size x 1) this array contains the labels of each pixel (belongs to which centroid)
+
+        distance = np.zeros(
+            (img_as_features.shape[0], self.n_clusters), dtype=float
+        )  # (distance for each colored pixel over the entire clusters)
+
+        # if the centriods have been not provided
+        if centroids_color is None:
+            centroids_indices = np.random.choice(
+                img_as_features.shape[0], self.n_clusters, replace=False
+            )  # initialize the centroids
+            centroids_color = img_as_features[centroids_indices]  # in terms of color
+            if self.spatial_segmentation:
+                centroids_spatial = xy_coords[
+                    centroids_indices
+                ]  # this to introduce restriction in the spatial space of the image
+
+            # Form initial clustering
+            if self.centroid_optimization:
+                rows = np.arange(img.shape[0])
+                columns = np.arange(img.shape[1])
+
+                sample_size = (
+                    len(rows) // 16 if len(rows) > len(columns) else len(columns) // 16
+                )
+                ii = np.random.choice(rows, size=sample_size, replace=False)
+                jj = np.random.choice(columns, size=sample_size, replace=False)
+                subimage = img[
+                    ii[:, np.newaxis], jj[np.newaxis, :], :
+                ]  # subimage for redistribute the centriods
+
+                if self.spatial_segmentation:
+                    centroids_color, centroids_spatial, _ = self.kmeans_segmentation(
+                        subimage,
+                        max_iterations // 2,
+                        centroids_color=centroids_color,
+                        centroids_spatial=centroids_spatial,
+                    )
+                else:
+                    centroids_color, _ = self.kmeans_segmentation(
+                        subimage,
+                        max_iterations // 2,
+                        centroids_color=centroids_color,
+                    )
+
+        for _ in range(max_iterations):
+            for centroid_idx in range(centroids_color.shape[0]):
+                distance[:, centroid_idx] = np.linalg.norm(
+                    img_as_features - centroids_color[centroid_idx], axis=1
+                )
+
+                if self.spatial_segmentation:
+                    distance[:, centroid_idx] += (
+                        np.linalg.norm(
+                            xy_coords - centroids_spatial[centroid_idx], axis=1
+                        )
+                        * self.spatial_segmentation_weight
+                    )
+
+            labels = np.argmin(
+                distance, axis=1
+            )  # assign each point in the feature space a label according to its distance from each centriod based on (spatial and color distance)
+
+            for centroid_idx in range(centroids_color.shape[0]):
+                cluster_colors = img_as_features[labels == centroid_idx]
+                if len(cluster_colors) > 0:  # Check if cluster is not empty
+                    new_centroid_color = np.mean(cluster_colors, axis=0)
+                    centroids_color[centroid_idx] = new_centroid_color
+
+                    if self.spatial_segmentation:
+                        cluster_spatial = xy_coords[labels == centroid_idx]
+                        new_centroid_spatial = np.mean(cluster_spatial, axis=0)
+                        centroids_spatial[centroid_idx] = new_centroid_spatial
+
+        if self.spatial_segmentation:
+            return centroids_color, centroids_spatial, labels
+        else:
+            return centroids_color, labels
+
+    def apply_k_means(self):
+        self.get_new_k_means_parameters()
+        if self.spatial_segmentation:
+            if self.k_means_LUV:
+                self.display_image(
+                    self.k_means_luv_input,
+                    self.ui.k_means_input_figure_canvas,
+                    "Input Image",
+                )
+                centroids_color, _, labels = self.kmeans_segmentation(
+                    self.k_means_luv_input, self.max_iterations
+                )
+            else:
+                self.display_image(
+                    self.k_means_input,
+                    self.ui.k_means_input_figure_canvas,
+                    "Input Image",
+                )
+                centroids_color, _, labels = self.kmeans_segmentation(
+                    self.k_means_input, self.max_iterations
+                )
+
+        else:
+            if self.k_means_LUV:
+                self.display_image(
+                    self.k_means_luv_input,
+                    self.ui.k_means_input_figure_canvas,
+                    "Input Image",
+                )
+                centroids_color, labels = self.kmeans_segmentation(
+                    self.k_means_luv_input, self.max_iterations
+                )
+            else:
+                self.display_image(
+                    self.k_means_input,
+                    self.ui.k_means_input_figure_canvas,
+                    "Input Image",
+                )
+                centroids_color, labels = self.kmeans_segmentation(
+                    self.k_means_input, self.max_iterations
+                )
+
+        self.k_means_output = centroids_color[labels]
+
+        if self.k_means_LUV:
+            self.k_means_output = self.k_means_output.reshape(
+                self.k_means_luv_input.shape
+            )
+        else:
+            self.k_means_output = self.k_means_output.reshape(self.k_means_input.shape)
+
+        self.k_means_output = (self.k_means_output - self.k_means_output.min()) / (
+            self.k_means_output.max() - self.k_means_output.min()
+        )
+        self.display_image(
+            self.k_means_output, self.ui.k_means_output_figure_canvas, "K-Means Output"
+        )
+
+    ## ============== Mean-Shift Methods ============== ##
+    def get_new_mean_shift_parameters(self):
+        self.mean_shift_window_size = self.ui.mean_shift_window_size_spinbox.value()
+        self.mean_shift_sigma = self.ui.mean_shift_sigma_spinbox.value()
+        self.mean_shift_threshold = self.ui.mean_shift_threshold_spinbox.value()
+
+        self.mean_shift_luv = self.ui.mean_shift_LUV_conversion.isChecked()
+
+    def mean_shift_clusters(self, image, window_size, threshold, sigma):
+        """
+        Perform Mean Shift clustering on an image.
+
+        Args:
+            image (numpy.ndarray): The input image.
+            window_size (float): The size of the window for the mean shift.
+            threshold (float): The convergence threshold.
+            sigma (float): The standard deviation for the Gaussian weighting.
+
+        Returns:
+            list: A list of dictionaries representing the clusters. Each dictionary contains:
+                - 'points': A boolean array indicating the points belonging to the cluster.
+                - 'center': The centroid of the cluster.
+        """
+        image = (
+            (image - image.min()) * (1 / (image.max() - image.min())) * 255
+        ).astype(np.uint8)
+        img = np.array(image, copy=True, dtype=float)
+
+        img_as_features = img.reshape(
+            -1, img.shape[2]
+        )  # feature space (each channel elongated)
+
+        num_points = len(img_as_features)
+        visited = np.full(num_points, False, dtype=bool)
+        clusters = []
+
+        while (
+            np.sum(visited) < num_points
+        ):  # check if all points have been visited, thus, assigned a cluster.
+            initial_mean_idx = np.random.choice(
+                np.arange(num_points)[np.logical_not(visited)]
+            )
+            initial_mean = img_as_features[initial_mean_idx]
+
+            while True:
+                distances = np.linalg.norm(
+                    initial_mean - img_as_features, axis=1
+                )  # distances
+
+                weights = gaussian_weight(
+                    distances, sigma
+                )  # weights for computing new mean
+
+                within_window = np.where(distances <= window_size / 2)[0]
+                within_window_bool = np.full(num_points, False, dtype=bool)
+                within_window_bool[within_window] = True
+
+                within_window_points = img_as_features[within_window]
+
+                new_mean = np.average(
+                    within_window_points, axis=0, weights=weights[within_window]
+                )
+
+                # Check convergence
+                if np.linalg.norm(new_mean - initial_mean) < threshold:
+                    merged = False  # Check merge condition
+                    for cluster in clusters:
+                        if (
+                            np.linalg.norm(cluster["center"] - new_mean)
+                            < 0.5 * window_size
+                        ):
+                            # Merge with existing cluster
+                            cluster["points"] = (
+                                cluster["points"] + within_window_bool
+                            )  # bool array that represent the points of each cluster
+                            cluster["center"] = 0.5 * (cluster["center"] + new_mean)
+                            merged = True
+                            break
+
+                    if not merged:
+                        # No merge, create new cluster
+                        clusters.append(
+                            {"points": within_window_bool, "center": new_mean}
+                        )
+
+                    visited[within_window] = True
+                    break
+
+                initial_mean = new_mean
+
+        return clusters
+
+    def calculate_mean_shift_clusters(self, image):
+        clusters = self.mean_shift_clusters(
+            image,
+            self.mean_shift_window_size,
+            self.mean_shift_threshold,
+            self.mean_shift_sigma,
+        )
+        output = np.zeros(image.shape)
+
+        for cluster in clusters:
+            bool_image = cluster["points"].reshape(image.shape[0], image.shape[1])
+            output[bool_image, :] = cluster["center"]
+
+        return output
+
+    def apply_mean_shift(self):
+        self.get_new_mean_shift_parameters()
+
+        if self.mean_shift_luv:
+            self.display_image(
+                self.mean_shift_luv_input,
+                self.ui.mean_shift_input_figure_canvas,
+                "Input Image",
+            )
+            self.mean_shift_output = self.calculate_mean_shift_clusters(
+                self.mean_shift_luv_input
+            )
+        else:
+            self.display_image(
+                self.mean_shift_input,
+                self.ui.mean_shift_input_figure_canvas,
+                "Input Image",
+            )
+            self.mean_shift_output = self.calculate_mean_shift_clusters(
+                self.mean_shift_input
+            )
+
+        self.mean_shift_output = (
+            self.mean_shift_output - self.mean_shift_output.min()
+        ) / (self.mean_shift_output.max() - self.mean_shift_output.min())
+        self.display_image(
+            self.mean_shift_output,
+            self.ui.mean_shift_output_figure_canvas,
+            "Mean Shift Output",
         )
 
 
