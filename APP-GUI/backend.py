@@ -42,6 +42,7 @@ from task4_ui import Ui_MainWindow
 def convert_to_grey(img_RGB: np.ndarray) -> np.ndarray:
     if len(img_RGB.shape) == 3:
         grey = np.dot(img_RGB[..., :3], [0.2989, 0.5870, 0.1140])
+        print(grey)
         return grey
     else:
         return img_RGB
@@ -348,6 +349,8 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.ui.apply_thresholding.clicked.connect(self.apply_thresholding)
         self.ui.apply_thresholding.setEnabled(False)
         self.ui.number_of_modes_slider.setEnabled(False)
+        self.ui.local_checkbox.stateChanged.connect(self.local_global_thresholding)
+        self.ui.global_checkbox.stateChanged.connect(self.local_global_thresholding)
 
         ### ==== General ==== ###
         # Connect menu action to load_image
@@ -374,7 +377,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         if file_path and isinstance(file_path, str):
             # Read the matrix, convert to rgb
             img = cv2.imread(file_path, 1)
-            img = convert_BGR_to_RGB(img)
+            # img = convert_BGR_to_RGB(img)
 
             current_tab = self.ui.tabWidget.currentIndex()
 
@@ -637,7 +640,11 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         if np.all(img_RGB != None):
             # Convert image to grayscale
             gray = convert_to_grey(img_RGB)
-
+            self.display_image(
+                gray,
+                self.ui.thresholding_input_figure_canvas,
+                "Input Image",
+            )
             Ix, Iy = np.gradient(gray)
             # Compute products of derivatives
             Ixx = Ix**2
@@ -1963,6 +1970,16 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.number_of_modes = self.ui.number_of_modes_slider.value()
         self.thresholding_type = self.ui.thresholding_comboBox.currentText()
 
+    def local_global_thresholding(self, state):
+        sender = self.sender()
+        if state == 2:  # Checked state
+            if sender == self.ui.local_checkbox:
+                self.ui.global_checkbox.setChecked(False)
+                self.local_or_global = "Local"
+            else:
+                self.ui.local_checkbox.setChecked(False)
+                self.local_or_global = "Global"
+
     def apply_thresholding(self):
         self.get_thresholding_parameters()
         if self.thresholding_type == "Optimal - Binary":
@@ -2116,7 +2133,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         image[object_pixels] = 255
         return image
 
-    def local_threshold(self, grayscale_image, threshold_algorithm, kernel_size=5):
+    def local_thresholding(self, grayscale_image, threshold_algorithm, kernel_size=5):
         """
         Description:
             - Applies local thresholding to an image.
