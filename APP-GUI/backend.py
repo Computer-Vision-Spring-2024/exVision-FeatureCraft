@@ -1,6 +1,9 @@
 # backend.py
 import os
 import random
+from itertools import combinations
+
+import numpy as np
 
 # To prevent conflicts with pyqt6
 os.environ["QT_API"] = "PyQt5"
@@ -35,17 +38,16 @@ from scipy.signal import convolve2d
 from skimage.transform import rescale, resize
 
 # from task3_ui import Ui_MainWindow
-from task4_ui import Ui_MainWindow
+from UI import Ui_MainWindow
 
 
 # Helper functions
 def convert_to_grey(img_RGB: np.ndarray) -> np.ndarray:
     if len(img_RGB.shape) == 3:
         grey = np.dot(img_RGB[..., :3], [0.2989, 0.5870, 0.1140])
-        print(grey)
-        return grey
+        return grey.astype(np.uint8)
     else:
-        return img_RGB
+        return img_RGB.astype(np.uint8)
 
 
 def convert_BGR_to_RGB(img_BGR_nd_arr: np.ndarray) -> np.ndarray:
@@ -304,7 +306,17 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.ui.reset_region_growing.setEnabled(False)
 
         ### ==== Agglomerative Clustering ==== ###
-        self.agg_input_image = None
+        self.agglo_input_image = None
+        self.agglo_output_image = None
+        self.agglo_number_of_clusters = 2
+        self.downsampling = False
+        self.agglo_scale_factor = 4
+        self.ui.apply_agglomerative.setEnabled(False)
+        self.ui.apply_agglomerative.clicked.connect(self.apply_agglomerative_clustering)
+        self.ui.downsampling.stateChanged.connect(self.get_agglomerative_parameters)
+        self.ui.agglo_scale_factor.valueChanged.connect(
+            self.get_agglomerative_parameters
+        )
 
         ### ==== K_Means ==== ###
         self.k_means_input = None
@@ -319,6 +331,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.k_means_LUV = False
 
         # K_Means Buttons
+        self.ui.apply_k_means.setEnabled(False)
         self.ui.apply_k_means.clicked.connect(self.apply_k_means)
         self.ui.spatial_segmentation.stateChanged.connect(
             self.enable_spatial_segmentation
@@ -334,23 +347,32 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.mean_shift_luv = False
 
         # Mean-Shift Buttons
+        self.ui.apply_mean_shift.setEnabled(False)
         self.ui.apply_mean_shift.clicked.connect(self.apply_mean_shift)
 
         ### ==== Thresholding ==== ###
         self.thresholding_grey_input = None
         self.thresholding_output = None
-        self.number_of_modes = 2
+        self.number_of_thresholds = 2
+        self.thresholding_type = "Optimal - Binary"
         self.local_or_global = "Global"
+        self.otsu_step = 1
+        self.separability_measure = 0
+        self.global_thresholds = None
         self.ui.thresholding_comboBox.currentIndexChanged.connect(
             self.get_thresholding_parameters
         )
 
         # Thresholding Buttons and checkbox
-        self.ui.apply_thresholding.clicked.connect(self.apply_thresholding)
         self.ui.apply_thresholding.setEnabled(False)
-        self.ui.number_of_modes_slider.setEnabled(False)
+        self.ui.apply_thresholding.clicked.connect(self.apply_thresholding)
+        self.ui.number_of_thresholds_slider.setEnabled(False)
+        self.ui.number_of_thresholds_slider.valueChanged.connect(
+            self.get_thresholding_parameters
+        )
         self.ui.local_checkbox.stateChanged.connect(self.local_global_thresholding)
         self.ui.global_checkbox.stateChanged.connect(self.local_global_thresholding)
+        self.ui.otsu_step_spinbox.setEnabled(False)
 
         ### ==== General ==== ###
         # Connect menu action to load_image
@@ -377,7 +399,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         if file_path and isinstance(file_path, str):
             # Read the matrix, convert to rgb
             img = cv2.imread(file_path, 1)
-            # img = convert_BGR_to_RGB(img)
+            img = convert_BGR_to_RGB(img)
 
             current_tab = self.ui.tabWidget.currentIndex()
 
@@ -387,6 +409,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     self.harris_current_image_RGB,
                     self.ui.harris_input_figure_canvas,
                     "Input Image",
+                    False,
                 )
                 self.ui.apply_harris_push_button.setEnabled(True)
                 self.ui.apply_lambda_minus_push_button.setEnabled(True)
@@ -405,21 +428,25 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     self.rg_input,
                     self.ui.region_growing_input_figure_canvas,
                     "Input Image",
+                    False,
                 )
                 self.display_image(
                     self.rg_output,
                     self.ui.region_growing_output_figure_canvas,
                     "Output Image",
+                    False,
                 )
                 self.ui.apply_region_growing.setEnabled(True)
                 self.ui.reset_region_growing.setEnabled(True)
             elif current_tab == 4:
-                self.agg_input_image = img
+                self.agglo_input_image = img
                 self.display_image(
-                    self.agg_input_image,
+                    self.agglo_input_image,
                     self.ui.agglomerative_input_figure_canvas,
                     "Input Image",
+                    False,
                 )
+                self.ui.apply_agglomerative.setEnabled(True)
             elif current_tab == 5:
                 self.k_means_luv_input = self.map_rgb_luv(img)
                 self.k_means_input = img
@@ -429,14 +456,16 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                         self.k_means_luv_input,
                         self.ui.k_means_input_figure_canvas,
                         "Input Image",
+                        False,
                     )
                 else:
                     self.display_image(
                         self.k_means_input,
                         self.ui.k_means_input_figure_canvas,
                         "Input Image",
+                        False,
                     )
-
+                self.ui.apply_k_means.setEnabled(True)
             elif current_tab == 6:
                 self.mean_shift_luv_input = self.map_rgb_luv(img)
                 self.mean_shift_input = img
@@ -446,19 +475,24 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                         self.mean_shift_luv_input,
                         self.ui.mean_shift_input_figure_canvas,
                         "Input Image",
+                        False,
                     )
                 else:
                     self.display_image(
                         self.mean_shift_input,
                         self.ui.mean_shift_input_figure_canvas,
                         "Input Image",
+                        False,
                     )
+                self.ui.apply_mean_shift.setEnabled(True)
             elif current_tab == 7:
                 self.thresholding_grey_input = convert_to_grey(img)
+                self.ui.number_of_thresholds_slider.setEnabled(True)
                 self.display_image(
                     self.thresholding_grey_input,
                     self.ui.thresholding_input_figure_canvas,
                     "Input Image",
+                    True,
                 )
                 self.ui.apply_thresholding.setEnabled(True)
 
@@ -469,17 +503,34 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             except TypeError:
                 pass
 
-    def display_image(self, image, canvas, title):
+    def display_image(
+        self, image, canvas, title, grey, hist_or_not=False, axis_disabled="off"
+    ):
         """ "
         Description:
             - Plots the given (image) in the specified (canvas)
         """
         canvas.figure.clear()
         ax = canvas.figure.add_subplot(111)
-        ax.imshow(image)
-        ax.axis("off")
+        if not hist_or_not:
+            if not grey:
+                ax.imshow(image)
+            elif grey:
+                ax.imshow(image, cmap="gray")
+        else:
+            if grey:
+                ax.hist(image.flatten(), bins=256, range=(0, 256), alpha=0.75)
+                for thresh in self.global_thresholds[0]:
+                    ax.axvline(x=thresh, color="r")
+            else:
+                image = convert_to_grey(image)
+                ax.hist(image.flatten(), bins=256, range=(0, 256), alpha=0.75)
+                for thresh in self.global_thresholds[0]:
+                    ax.axvline(x=thresh, color="r")
+
+        ax.axis(axis_disabled)
         ax.set_title(title)
-        canvas.figure.subplots_adjust(left=0, right=1, bottom=0.05, top=0.95)
+        canvas.figure.subplots_adjust(left=0.20, right=0.80, bottom=0.20, top=0.80)
         canvas.draw()
 
     # @staticmethod
@@ -509,11 +560,19 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         else:
             if response == QMessageBox.Yes:
                 self.sift_target_image = image
-                self.display_image(image, self.ui.input_1_figure_canvas, "Target Image")
+                self.display_image(
+                    image,
+                    self.ui.input_1_figure_canvas,
+                    "Target Image",
+                    False,
+                )
             elif response == QMessageBox.No:
                 self.sift_template_image = image
                 self.display_image(
-                    image, self.ui.input_2_figure_canvas, "Template Image"
+                    image,
+                    self.ui.input_2_figure_canvas,
+                    "Template Image",
+                    False,
                 )
 
     ## ================ Conver to LUV colorspace ================ ##
@@ -590,6 +649,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     output_img,
                     self.ui.harris_output_figure_canvas,
                     "Harris Output Image",
+                    False,
                 )
             elif operator == 1:
                 if np.all(self.eigenvalues != None):
@@ -612,6 +672,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                         output_img,
                         self.ui.harris_output_figure_canvas,
                         "Lambda-Minus Output Image",
+                        False,
                     )
 
         return
@@ -642,8 +703,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             gray = convert_to_grey(img_RGB)
             self.display_image(
                 gray,
-                self.ui.thresholding_input_figure_canvas,
+                self.ui.harris_input_figure_canvas,
                 "Input Image",
+                False,
             )
             Ix, Iy = np.gradient(gray)
             # Compute products of derivatives
@@ -680,7 +742,10 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 255,
             )  # Highlight detected corners in blue
             self.display_image(
-                output_img, self.ui.harris_output_figure_canvas, "Harris Output Image"
+                output_img,
+                self.ui.harris_output_figure_canvas,
+                "Harris Output Image",
+                False,
             )
 
             return (
@@ -757,6 +822,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             output_image,
             self.ui.harris_output_figure_canvas,
             "Lambda-Minus Output Image",
+            False,
         )
 
     def clear_right_image(self):
@@ -1476,7 +1542,12 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         )
 
         self.sift_output_image = img_match
-        self.display_image(img_match, self.ui.sift_output_figure_canvas, "SIFT Output")
+        self.display_image(
+            img_match,
+            self.ui.sift_output_figure_canvas,
+            "SIFT Output",
+            False,
+        )
         self.ui.tabWidget.setCurrentIndex(2)
 
         end = time.time()
@@ -1615,6 +1686,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             output_image,
             self.ui.region_growing_output_figure_canvas,
             "Region Growing Output",
+            False,
         )
 
     def reset_region_growing(self):
@@ -1624,12 +1696,16 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.ui.region_growing_threshold.setText(f"Threshold: {self.rg_threshold}")
         self.rg_output = self.rg_input
         self.display_image(
-            self.rg_input, self.ui.region_growing_input_figure_canvas, "Input Image"
+            self.rg_input,
+            self.ui.region_growing_input_figure_canvas,
+            "Input Image",
+            False,
         )
         self.display_image(
             self.rg_output,
             self.ui.region_growing_output_figure_canvas,
             "Region Growing Output",
+            False,
         )
 
     ## ============== K-Means Methods ============== ##
@@ -1777,6 +1853,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     self.k_means_luv_input,
                     self.ui.k_means_input_figure_canvas,
                     "Input Image",
+                    False,
                 )
                 centroids_color, _, labels = self.kmeans_segmentation(
                     self.k_means_luv_input, self.max_iterations
@@ -1786,6 +1863,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     self.k_means_input,
                     self.ui.k_means_input_figure_canvas,
                     "Input Image",
+                    False,
                 )
                 centroids_color, _, labels = self.kmeans_segmentation(
                     self.k_means_input, self.max_iterations
@@ -1797,6 +1875,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     self.k_means_luv_input,
                     self.ui.k_means_input_figure_canvas,
                     "Input Image",
+                    False,
                 )
                 centroids_color, labels = self.kmeans_segmentation(
                     self.k_means_luv_input, self.max_iterations
@@ -1806,6 +1885,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     self.k_means_input,
                     self.ui.k_means_input_figure_canvas,
                     "Input Image",
+                    False,
                 )
                 centroids_color, labels = self.kmeans_segmentation(
                     self.k_means_input, self.max_iterations
@@ -1824,7 +1904,10 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             self.k_means_output.max() - self.k_means_output.min()
         )
         self.display_image(
-            self.k_means_output, self.ui.k_means_output_figure_canvas, "K-Means Output"
+            self.k_means_output,
+            self.ui.k_means_output_figure_canvas,
+            "K-Means Output",
+            False,
         )
 
     ## ============== Mean-Shift Methods ============== ##
@@ -1942,6 +2025,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 self.mean_shift_luv_input,
                 self.ui.mean_shift_input_figure_canvas,
                 "Input Image",
+                False,
             )
             self.mean_shift_output = self.calculate_mean_shift_clusters(
                 self.mean_shift_luv_input
@@ -1951,6 +2035,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 self.mean_shift_input,
                 self.ui.mean_shift_input_figure_canvas,
                 "Input Image",
+                False,
             )
             self.mean_shift_output = self.calculate_mean_shift_clusters(
                 self.mean_shift_input
@@ -1963,12 +2048,23 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             self.mean_shift_output,
             self.ui.mean_shift_output_figure_canvas,
             "Mean Shift Output",
+            False,
         )
 
     ## ============== Thresholding Methods ============== ##
     def get_thresholding_parameters(self):
-        self.number_of_modes = self.ui.number_of_modes_slider.value()
+        self.number_of_thresholds = self.ui.number_of_thresholds_slider.value()
         self.thresholding_type = self.ui.thresholding_comboBox.currentText()
+        self.otsu_step = self.ui.otsu_step_spinbox.value()
+        self.ui.number_of_thresholds.setText(
+            "Number of thresholds: " + str(self.number_of_thresholds)
+        )
+        if self.thresholding_type == "OTSU":
+            self.ui.number_of_thresholds_slider.setEnabled(True)
+            self.ui.otsu_step_spinbox.setEnabled(True)
+        else:
+            self.ui.number_of_thresholds_slider.setEnabled(False)
+            self.ui.otsu_step_spinbox.setEnabled(False)
 
     def local_global_thresholding(self, state):
         sender = self.sender()
@@ -1988,30 +2084,54 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     self.thresholding_grey_input, self.optimal_thresholding
                 )
             elif self.local_or_global == "Global":
-                self.thresholding_output = self.optimal_thresholding(
-                    self.thresholding_grey_input
+                self.thresholding_output, self.global_thresholds, _ = (
+                    self.optimal_thresholding(self.thresholding_grey_input)
+                )
+                self.display_image(
+                    self.thresholding_grey_input,
+                    self.ui.histogram_global_thresholds_figure_canvas,
+                    "Histogram",
+                    True,
+                    True,
+                    "on",
                 )
 
-        elif self.thresholding_type == "OTSU - Binary":
+        elif self.thresholding_type == "OTSU":
             if self.local_or_global == "Local":
                 self.thresholding_output = self.local_thresholding(
-                    self.thresholding_grey_input, self.otsu_thresholding
+                    grayscale_image=self.thresholding_grey_input,
+                    threshold_algorithm=lambda img: self.multi_otsu(
+                        img, self.number_of_thresholds, self.otsu_step
+                    ),
+                    kernel_size=5,
                 )
             elif self.local_or_global == "Global":
-                self.thresholding_output = self.otsu_thresholding(
-                    self.thresholding_grey_input
+                (
+                    self.thresholding_output,
+                    self.global_thresholds,
+                    self.separability_measure,
+                ) = self.multi_otsu(
+                    self.thresholding_grey_input,
+                    self.number_of_thresholds,
+                    self.otsu_step,
                 )
-
-        elif self.thresholding_type == "Multi Modal":
-            if self.local_or_global == "Local":
-                pass
-            elif self.local_or_global == "Global":
-                pass
+                self.display_image(
+                    self.thresholding_grey_input,
+                    self.ui.histogram_global_thresholds_figure_canvas,
+                    "Histogram",
+                    True,
+                    True,
+                    "on",
+                )
+                self.ui.separability_measure.setText(
+                    "Separability Measure = {:.3f}".format(self.separability_measure)
+                )
 
         self.display_image(
             self.thresholding_output,
             self.ui.thresholding_output_figure_canvas,
             "Thresholding Output",
+            True,
         )
 
     def optimal_thresholding(self, image):
@@ -2059,7 +2179,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         image[background_pixels] = 0
         # Set object pixels black
         image[object_pixels] = 255
-        return image
+        return image, [[threshold]], threshold
 
     def otsu_thresholding(self, image):
         """
@@ -2149,8 +2269,8 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         # Pad the image to avoid lossing information of the boundry pixels or getting out of bounds
         padded_image = _pad_image(kernel_size, grayscale_image)
         thresholded_image = np.zeros_like(grayscale_image)
-        for i in range(grayscale_image.shape[0]):
-            for j in range(grayscale_image.shape[1]):
+        for i in range(0, grayscale_image.shape[0], 4):
+            for j in range(0, grayscale_image.shape[1], 4):
                 # Take the current pixel and its neighboors to apply the thresholding algorithm on them
                 window = padded_image[i : i + kernel_size, j : j + kernel_size]
                 # If all the pixels belong to the same class (single intensity level), assign them all to background class
@@ -2158,14 +2278,354 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 # intensity in the object pixels
                 if np.all(window == window[0, 0]):
                     thresholded_image[i, j] = 255
+                    thresholded_window = window
                 else:
                     # Assign the value of the middle pixel of the thresholded window to the current pixel of the thresholded image
+                    thresholded_window, _, _ = threshold_algorithm(window)
                     thresholded_image[
                         i : i + kernel_size // 2, j : j + kernel_size // 2
-                    ] = threshold_algorithm(window)[
-                        : kernel_size // 2, : kernel_size // 2
-                    ]
+                    ] = thresholded_window[: kernel_size // 2, : kernel_size // 2]
         return thresholded_image
+
+    def generate_combinations(self, k, step, start=1, end=255):
+        """
+        Generate proper combinations of thresholds for histogram bins based on the number of thresholds
+
+        Parameters:
+        - k: the number of thresholds
+        - step: the increment distance for the threshold, not 1 by default for optimization purposes
+        - start: the first number in histogram bins which is 1 by default.
+        - end: last number in histogram bins which is 255 by default.
+
+        Returns:
+        a list of the proper combinations of thresholds
+        """
+        combinations = []  # List to store the combinations
+
+        def helper(start, end, k, prefix):
+            if k == 0:
+                combinations.append(prefix)  # Add the combination to the list
+                return
+            for i in range(start, end - k + 2, step):
+                helper(i + 1, end, k - 1, prefix + [i])
+
+        helper(start, end, k, [])
+
+        return combinations  # Return the list of combinations
+
+    def multi_otsu(self, image, number_of_thresholds, step):
+        """
+        Performing image segmentation based on otsu algorithm
+
+        Parameters:
+            - image: The image to be thresholded
+            - number_of_thresholds: the number of thresholds to seperate the histogram
+            - step: the step taken by each threshold in each combination, not  by default for optimization purposes
+        Returns:
+            - otsu_img : The thresholded image
+            - final_thresholds: A 2D array of the final thresholds containing only one element
+            - separability_measure: A metric to evaluate the seperation process.
+        """
+        # Make a copy of the input image
+        otsu_img = image.copy()
+        # Create a pdf out of the input image
+        pi_dist = Normalized_histogram_computation(otsu_img)
+        # Initializing the maximum variance
+        maximum_variance = 0
+        # Get the list of the combination of all the candidate thresholds
+        candidates_list = self.generate_combinations(
+            start=1, end=255, k=number_of_thresholds, step=step
+        )
+        # Calculate the global mean to calculate the global variance to evaluate the seperation process
+        global_mean = np.sum(np.arange(len(pi_dist)) * pi_dist)
+        global_variance = np.sum(
+            ((np.arange(len(pi_dist)) - global_mean) ** 2) * pi_dist
+        )
+        # Array to store the thresholds at which the between_class_variance has a maximum value
+        threshold_values = []
+        # Initialize to None
+        separability_measure = None
+        for candidates in candidates_list:
+            # Compute the sum of probabilities for the first segment (from 0 to the first candidate)
+            P_matrix = [np.sum(pi_dist[: candidates[0]])]
+            # Compute the sum of probabilities for the middle segments
+            P_matrix += [
+                np.sum(pi_dist[candidates[i] : candidates[i + 1]])
+                for i in range(len(candidates) - 1)
+            ]
+            # Compute the sum of probabilities for the last segment (from the last candidate to the end of the distribution)
+            P_matrix.append(np.sum(pi_dist[candidates[-1] :]))
+            # Check that no value in the sum matrix is zero
+            if np.any(P_matrix) == 0:
+                continue
+
+            # Compute the mean value for the first segment
+            if P_matrix[0] != 0:
+                M_matrix = [
+                    (1 / P_matrix[0])
+                    * np.sum([i * pi_dist[i] for i in np.arange(0, candidates[0], 1)])
+                ]
+            else:
+                M_matrix = [0]  # Handle division by zero
+            # Compute the mean values for the middle segments
+            M_matrix += [
+                (
+                    (1 / P_matrix[i + 1])
+                    * np.sum(
+                        [
+                            ind * pi_dist[ind]
+                            for ind in np.arange(candidates[i], candidates[i + 1], 1)
+                        ]
+                    )
+                    if P_matrix[i + 1] != 0
+                    else 0
+                )
+                for i in range(len(candidates) - 1)
+            ]
+            # Compute the mean value for the last segment
+            M_matrix.append(
+                (1 / P_matrix[-1])
+                * np.sum(
+                    [k * pi_dist[k] for k in np.arange(candidates[-1], len(pi_dist), 1)]
+                )
+                if P_matrix[-1] != 0
+                else 0
+            )
+            # between_classes_variance = np.sum([P_matrix[0]*P_matrix[1]*((M_matrix[0] - M_matrix[1])**2) ])
+            between_classes_variance = np.sum(
+                [
+                    P_matrix[i] * P_matrix[j] * ((M_matrix[i] - M_matrix[j]) ** 2)
+                    for i, j in list(combinations(range(number_of_thresholds + 1), 2))
+                ]
+            )
+
+            # Loop over all intensity levels and try them as thresholds, then compute the between_class_variance to check the separability measure according to this threshold value
+            if between_classes_variance > maximum_variance:
+                maximum_variance = between_classes_variance
+                # If the between_class_variance corrisponding to this threshold intensity is maximum, store the threshold value
+                threshold_values = [candidates]
+                # Calculate the  Seperability Measure to evaluate the seperation process
+                separability_measure = between_classes_variance / global_variance
+            # To handel the case when there is more than one threshold value, maximize the between_class_variance, the optimal threshold in this case is their avg
+            elif between_classes_variance == maximum_variance:
+                threshold_values.append(candidates)
+        # If there are multiple group of candidates, consider the mean value of each of them as the final thresholds
+        if len(threshold_values) > 1:
+            # Get the average of the thresholds that maximize the between_class_variance
+            final_thresholds = [list(np.mean(threshold_values, axis=0, dtype=int))]
+            # print('multi for the same threshold after averaging', final_thresholds)
+        elif len(threshold_values) == 1:
+            # if single threshold maximize the between_class_variance, then this is the perfect threshold to separate the classes
+            # print('one for the max variance', threshold_values)
+            final_thresholds = threshold_values
+        else:
+            # If no maximum between_class_variance then all the pixels belong to the same class (single intensity level), so assign them all to background class
+            # we do so for simplicity since this often happen in the background pixels in the local thresholding, it rarely happen that the whole window has single
+            # intensity in the object pixels
+            otsu_img[np.where(image > 0)] = 255
+            return otsu_img
+        # Compute the regions in the image
+        regions_in_image = [
+            np.where(np.logical_and(image > 0, image < final_thresholds[0][0]))
+        ]
+        regions_in_image += [
+            np.where(
+                np.logical_and(
+                    image > final_thresholds[0][i], image < final_thresholds[0][i + 1]
+                )
+            )
+            for i in range(1, len(final_thresholds[0]) - 1)
+        ]
+        regions_in_image.append(np.where(image > final_thresholds[0][-1]))
+
+        levels = np.linspace(0, 255, number_of_thresholds + 1)
+        for i, region in enumerate(regions_in_image):
+            otsu_img[region] = levels[i]
+        return otsu_img, final_thresholds, separability_measure
+
+    ## ============== Agglomerative Clustering ============== ##
+    def get_agglomerative_parameters(self):
+        self.downsampling = self.ui.downsampling.isChecked()
+        self.agglo_number_of_clusters = self.ui.agglo_num_of_clusters_spinBox.value()
+        self.agglo_scale_factor = self.ui.agglo_scale_factor.value()
+
+    def downsample_image(self):
+        # Get the dimensions of the original image
+        height, width, channels = self.agglo_input_image.shape
+
+        # Calculate new dimensions after downsampling
+        new_width = int(width / self.agglo_scale_factor)
+        new_height = int(height / self.agglo_scale_factor)
+
+        # Create an empty array for the downsampled image
+        downsampled_image = np.zeros((new_height, new_width, channels), dtype=np.uint8)
+
+        # Iterate through the original image and select pixels based on the scale factor
+        for y in range(0, new_height):
+            for x in range(0, new_width):
+                downsampled_image[y, x] = self.agglo_input_image[
+                    y * self.agglo_scale_factor, x * self.agglo_scale_factor
+                ]
+
+        return downsampled_image
+
+    def agglo_reshape_image(self, image):
+        pixels = image.reshape((-1, 3))
+        return pixels
+
+    def euclidean_distance(self, point1, point2):
+        """
+        Description:
+            -   Computes euclidean distance of point1 and point2.
+                Noting that "point1" and "point2" are lists.
+        """
+        return np.linalg.norm(np.array(point1) - np.array(point2))
+
+    def clusters_distance(self, cluster1, cluster2):
+        """
+        Description:
+            -   Computes distance between two clusters.
+                cluster1 and cluster2 are lists of lists of points
+        """
+        return max(
+            [
+                self.euclidean_distance(point1, point2)
+                for point1 in cluster1
+                for point2 in cluster2
+            ]
+        )
+
+    def clusters_distance_2(self, cluster1, cluster2):
+        """
+        Description:
+            -   Computes distance between two centroids of the two clusters
+                cluster1 and cluster2 are lists of lists of points
+        """
+        cluster1_center = np.average(cluster1, axis=0)
+        cluster2_center = np.average(cluster2, axis=0)
+        return self.euclidean_distance(cluster1_center, cluster2_center)
+
+    def initial_clusters(self, points, initial_k=25):
+        """
+        partition pixels into self.initial_k groups based on color similarity
+        """
+        # Initialize a dictionary to hold the clusters each represented by:
+        # the centroid color as a key
+        # and the list of pixels that belong to that cluster as a value
+        groups = {}
+        # Defining the partitioning step
+        d = int(256 / (initial_k))
+        # Iterate over the range of initial clusters and assign the centroid colors for each cluster.
+        # The centroid colors are determined by the multiples of the step size (d) ranging from 0 to 255.
+        # Each centroid color is represented as an RGB tuple (j, j, j) where j is a multiple of d,
+        # ensuring even distribution across the color space.
+        for i in range(initial_k):
+            j = i * d
+            groups[(j, j, j)] = []
+        # These lines iterate over each pixel in the image represented by the points array.
+        # It calculates the Euclidean distance between the current pixel p and each centroid color (c)
+        # using the euclidean_distance function. It then assigns the pixel p to the cluster with the closest centroid color.
+        # The min function with a custom key function (lambda c: euclidean_distance(p, c)) finds the centroid color with the minimum distance to the pixel p,
+        # and the pixel p is appended to the corresponding cluster in the groups dictionary.
+        for i, p in enumerate(points):
+            if i % 100000 == 0:
+                print("processing pixel:", i)
+            go = min(groups.keys(), key=lambda c: self.euclidean_distance(p, c))
+            groups[go].append(p)
+        # This line returns a list of pixel groups (clusters) where each group contains
+        # the pixels belonging to that cluster.
+        # It filters out any empty clusters by checking the length of each cluster list.
+        return [g for g in groups.values() if len(g) > 0]
+
+    def fit_clusters(self, points):
+
+        # initially, assign each point to a distinct cluster
+        print("Computing initial clusters ...")
+        self.clusters_list = self.initial_clusters(points, initial_k=25)
+        print("number of initial clusters:", len(self.clusters_list))
+        print("merging clusters ...")
+
+        while len(self.clusters_list) > self.agglo_number_of_clusters:
+
+            # Find the closest (most similar) pair of clusters
+            cluster1, cluster2 = min(
+                [
+                    (c1, c2)
+                    for i, c1 in enumerate(self.clusters_list)
+                    for c2 in self.clusters_list[:i]
+                ],
+                key=lambda c: self.clusters_distance_2(c[0], c[1]),
+            )
+
+            # Remove the two clusters from the clusters list
+            self.clusters_list = [
+                c for c in self.clusters_list if c != cluster1 and c != cluster2
+            ]
+
+            # Merge the two clusters
+            merged_cluster = cluster1 + cluster2
+
+            # Add the merged cluster to the clusters list
+            self.clusters_list.append(merged_cluster)
+
+            print("number of clusters:", len(self.clusters_list))
+
+        print("assigning cluster num to each point ...")
+        self.cluster = {}
+        for cl_num, cl in enumerate(self.clusters_list):
+            for point in cl:
+                self.cluster[tuple(point)] = cl_num
+
+        print("Computing cluster centers ...")
+        self.centers = {}
+        for cl_num, cl in enumerate(self.clusters_list):
+            self.centers[cl_num] = np.average(cl, axis=0)
+
+    def predict_cluster(self, point):
+        """
+        Find cluster number of point
+        """
+        # assuming point belongs to clusters that were computed by fit functions
+        return self.cluster[tuple(point)]
+
+    def predict_center(self, point):
+        """
+        Find center of the cluster that point belongs to
+        """
+        point_cluster_num = self.predict_cluster(point)
+        center = self.centers[point_cluster_num]
+        return center
+
+    def apply_agglomerative_clustering(self):
+        start = time.time()
+        if self.downsampling:
+            agglo_downsampled_image = self.downsample_image()
+        else:
+            agglo_downsampled_image = self.agglo_input_image
+        self.get_agglomerative_parameters()
+        pixels = self.agglo_reshape_image(agglo_downsampled_image)
+        self.fit_clusters(pixels)
+
+        self.agglo_output_image = [
+            [self.predict_center(pixel) for pixel in row]
+            for row in agglo_downsampled_image
+        ]
+        self.agglo_output_image = np.array(self.agglo_output_image, np.uint8)
+
+        self.display_image(
+            self.agglo_output_image,
+            self.ui.agglomerative_output_figure_canvas,
+            f"Segmented image with k={self.agglo_number_of_clusters}",
+            False,
+        )
+
+        end = time.time()
+        elapsed_time_seconds = end - start
+        minutes = int(elapsed_time_seconds // 60)
+        seconds = int(elapsed_time_seconds % 60)
+        self.ui.agglo_elapsed_time.setText(
+            "Elapsed Time is {:02d} minutes and {:02d} seconds".format(minutes, seconds)
+        )
 
 
 if __name__ == "__main__":

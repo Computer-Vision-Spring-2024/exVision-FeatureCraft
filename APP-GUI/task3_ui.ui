@@ -418,20 +418,38 @@
          </layout>
         </item>
         <item>
-         <layout class="QHBoxLayout" name="horizontalLayout_19">
+         <layout class="QHBoxLayout" name="horizontalLayout_36">
           <item>
-           <widget class="QPushButton" name="reset_agglomerative">
-            <property name="text">
-             <string>Reset Agglomerative</string>
-            </property>
-           </widget>
+           <layout class="QHBoxLayout" name="horizontalLayout_35">
+            <item>
+             <widget class="QLabel" name="agglo_num_of_clusters_label">
+              <property name="text">
+               <string>Number of Clusters (k)</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="agglo_num_of_clusters_spinBox">
+              <property name="minimum">
+               <number>2</number>
+              </property>
+              <property name="maximum">
+               <number>25</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
           <item>
-           <widget class="QPushButton" name="apply_agglomerative">
-            <property name="text">
-             <string>Apply Agglomerative Clustering</string>
-            </property>
-           </widget>
+           <layout class="QHBoxLayout" name="horizontalLayout_19">
+            <item>
+             <widget class="QPushButton" name="apply_agglomerative">
+              <property name="text">
+               <string>Apply Agglomerative Clustering</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
          </layout>
         </item>
@@ -704,20 +722,66 @@
            </layout>
           </item>
           <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_33">
+           <layout class="QHBoxLayout" name="horizontalLayout_39">
             <item>
-             <widget class="QLabel" name="number_of_modes">
+             <widget class="QCheckBox" name="otsu_binary">
               <property name="text">
-               <string>Number of modes: 2</string>
+               <string>Binary</string>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
               </property>
              </widget>
             </item>
             <item>
-             <widget class="QSlider" name="horizontalSlider">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+             <widget class="QCheckBox" name="otsu_multi_modal">
+              <property name="text">
+               <string>Multi Modal</string>
               </property>
              </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="separability_measure">
+              <property name="text">
+               <string>TextLabel</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_40">
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_38">
+              <item>
+               <widget class="QLabel" name="otsu_step_label">
+                <property name="text">
+                 <string>Step</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="otsu_step_spinbox"/>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayout_33">
+              <item>
+               <widget class="QLabel" name="number_of_modes">
+                <property name="text">
+                 <string>Number of modes: 2</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSlider" name="horizontalSlider">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+               </widget>
+              </item>
+             </layout>
             </item>
            </layout>
           </item>
@@ -746,6 +810,23 @@
            </widget>
           </item>
          </layout>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_9">
+       <attribute name="title">
+        <string>Histogram Global Thresholds</string>
+       </attribute>
+       <layout class="QHBoxLayout" name="horizontalLayout_37">
+        <item>
+         <widget class="QFrame" name="frame_3">
+          <property name="frameShape">
+           <enum>QFrame::StyledPanel</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Raised</enum>
+          </property>
+         </widget>
         </item>
        </layout>
       </widget>
