@@ -886,6 +886,9 @@ class Ui_MainWindow(object):
             self.tabWidget.indexOf(self.tab_9),
             _translate("MainWindow", "Histogram Global Thresholds"),
         )
+        font_global_thresholds_label = QtGui.QFont()
+        font_global_thresholds_label.setPointSize(14) 
+        self.histogram_global_thresholds_label.setFont(font_global_thresholds_label)
         self.histogram_global_thresholds_label.setText(
             _translate("MainWindow", "Thresholds values are ")
         )
