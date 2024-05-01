@@ -2159,9 +2159,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         background_mean = np.sum(corners) / 4
         # Calculate the mean of the object class by summing the intensities of the image then subtracting the four corners then dividing by the number
         # of pixels in the full image - 4
-        object_mean = (np.sum(optimal_image) - np.sum(corners)) / (
-            optimal_image.shape[0] * optimal_image.shape[1] - 4
-        )
+        object_mean = (np.sum(optimal_image) - np.sum(corners)) / (image.shape[0] * image.shape[1] - 4)
         # Set random iinitial values for the thresholds
         threshold = -1
         prev_threshold = 0
