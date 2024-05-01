@@ -2207,8 +2207,8 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         # Pad the image to avoid lossing information of the boundry pixels or getting out of bounds
         padded_image = _pad_image(kernel_size, grayscale_image)
         thresholded_image = np.zeros_like(grayscale_image)
-        for i in range(0, grayscale_image.shape[0], 4):
-            for j in range(0, grayscale_image.shape[1], 4):
+        for i in range(0, grayscale_image.shape[0]):
+            for j in range(0, grayscale_image.shape[1]):
                 # Take the current pixel and its neighboors to apply the thresholding algorithm on them
                 window = padded_image[i : i + kernel_size, j : j + kernel_size]
                 # If all the pixels belong to the same class (single intensity level), assign them all to background class
