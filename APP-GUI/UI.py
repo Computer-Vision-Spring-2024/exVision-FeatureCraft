@@ -300,17 +300,38 @@ class Ui_MainWindow(object):
         self.horizontalLayout_35.addWidget(self.agglo_num_of_clusters_label)
         self.agglo_num_of_clusters_spinBox = QtWidgets.QSpinBox(self.tab_5)
         self.agglo_num_of_clusters_spinBox.setMinimum(2)
-        self.agglo_num_of_clusters_spinBox.setMaximum(25)
+        self.agglo_num_of_clusters_spinBox.setMaximum(10)
         self.agglo_num_of_clusters_spinBox.setObjectName(
             "agglo_num_of_clusters_spinBox"
         )
         self.horizontalLayout_35.addWidget(self.agglo_num_of_clusters_spinBox)
+
+        self.initial_num_of_clusters_HLayout = QtWidgets.QHBoxLayout()
+        self.initial_num_of_clusters_HLayout.setObjectName(
+            "initial_num_of_clusters_HLayout"
+        )
+        self.initial_num_of_clusters_label = QtWidgets.QLabel(self.tab_5)
+        self.initial_num_of_clusters_label.setObjectName(
+            "initial_num_of_clusters_label"
+        )
+        self.initial_num_of_clusters_HLayout.addWidget(
+            self.initial_num_of_clusters_label
+        )
+        self.initial_num_of_clusters_spinBox = QtWidgets.QSpinBox(self.tab_5)
+        self.initial_num_of_clusters_spinBox.setMinimum(3)
+        self.initial_num_of_clusters_spinBox.setObjectName(
+            "initial_num_of_clusters_spinBox"
+        )
+        self.initial_num_of_clusters_HLayout.addWidget(
+            self.initial_num_of_clusters_spinBox
+        )
 
         self.verticalLayout_12 = QtWidgets.QVBoxLayout()
         self.verticalLayout_12.setObjectName("verticalLayout_12")
         self.agglo_elapsed_time = QtWidgets.QLabel(self.tab_5)
         self.agglo_elapsed_time.setObjectName("agglo_elapsed_time")
         self.verticalLayout_12.addLayout(self.horizontalLayout_35)
+        self.verticalLayout_12.addLayout(self.initial_num_of_clusters_HLayout)
         self.verticalLayout_12.addWidget(self.agglo_elapsed_time)
 
         self.horizontalLayout_36.addLayout(self.verticalLayout_12)
@@ -837,6 +858,9 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Agglomerative Clustering"),
         )
         self.n_clusters_label.setText(_translate("MainWindow", "n clusters"))
+        self.initial_num_of_clusters_label.setText(
+            _translate("MainWindow", "Initial number of clusters")
+        )
         self.k_means_max_iterations_label.setText(
             _translate("MainWindow", "Max Iterations")
         )
@@ -887,7 +911,7 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Histogram Global Thresholds"),
         )
         font_global_thresholds_label = QtGui.QFont()
-        font_global_thresholds_label.setPointSize(14) 
+        font_global_thresholds_label.setPointSize(14)
         self.histogram_global_thresholds_label.setFont(font_global_thresholds_label)
         self.histogram_global_thresholds_label.setText(
             _translate("MainWindow", "Thresholds values are ")
