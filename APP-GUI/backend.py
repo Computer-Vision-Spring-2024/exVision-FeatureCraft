@@ -523,17 +523,19 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 ax.hist(image.flatten(), bins=256, range=(0, 256), alpha=0.75)
                 for thresh in self.global_thresholds[0]:
                     ax.axvline(x=thresh, color="r")
+                    thresh = int(thresh)
                     # Convert the threshold to string with 3 decimal places and add it to the label text
                     current_text = self.ui.histogram_global_thresholds_label.text()
-                    self.ui.histogram_global_thresholds_label.setText(current_text + ' ' + format(thresh, '.3f'))
+                    self.ui.histogram_global_thresholds_label.setText(current_text + ' ' + str(thresh))
             else:
                 image = convert_to_grey(image)
                 ax.hist(image.flatten(), bins=256, range=(0, 256), alpha=0.75)
                 for thresh in self.global_thresholds[0]:
                     ax.axvline(x=thresh, color="r")
+                    thresh = int(thresh)
                     # Convert the threshold to string with 3 decimal places and add it to the label text
                     current_text = self.ui.histogram_global_thresholds_label.text()
-                    self.ui.histogram_global_thresholds_label.setText(current_text + ' ' + format(thresh, '.3f'))
+                    self.ui.histogram_global_thresholds_label.setText(current_text + ' ' +str(thresh))
 
         ax.axis(axis_disabled)
         ax.set_title(title)
@@ -2207,8 +2209,8 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         # Pad the image to avoid lossing information of the boundry pixels or getting out of bounds
         padded_image = _pad_image(kernel_size, grayscale_image)
         thresholded_image = np.zeros_like(grayscale_image)
-        for i in range(0, grayscale_image.shape[0], 4):
-            for j in range(0, grayscale_image.shape[1], 4):
+        for i in range(0, grayscale_image.shape[0]):
+            for j in range(0, grayscale_image.shape[1]):
                 # Take the current pixel and its neighboors to apply the thresholding algorithm on them
                 window = padded_image[i : i + kernel_size, j : j + kernel_size]
                 # If all the pixels belong to the same class (single intensity level), assign them all to background class
