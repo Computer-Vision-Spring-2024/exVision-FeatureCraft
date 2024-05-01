@@ -518,7 +518,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             elif grey:
                 ax.imshow(image, cmap="gray")
         else:
-            self.ui.histogram_global_thresholds_label.setText("Thresholds values are ")
+            self.ui.histogram_global_thresholds_label.setText(" ")
             if grey:
                 ax.hist(image.flatten(), bins=256, range=(0, 256), alpha=0.75)
                 for thresh in self.global_thresholds[0]:
@@ -2161,9 +2161,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         background_mean = np.sum(corners) / 4
         # Calculate the mean of the object class by summing the intensities of the image then subtracting the four corners then dividing by the number
         # of pixels in the full image - 4
-        object_mean = (np.sum(optimal_image) - np.sum(corners)) / (
-            optimal_image.shape[0] * optimal_image.shape[1] - 4
-        )
+        object_mean = (np.sum(optimal_image) - np.sum(corners)) / (image.shape[0] * image.shape[1] - 4)
         # Set random iinitial values for the thresholds
         threshold = -1
         prev_threshold = 0
@@ -2209,24 +2207,24 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         # Pad the image to avoid lossing information of the boundry pixels or getting out of bounds
         padded_image = _pad_image(kernel_size, grayscale_image)
         thresholded_image = np.zeros_like(grayscale_image)
-        for i in range(0, grayscale_image.shape[0]):
-            for j in range(0, grayscale_image.shape[1]):
+        for i in range(0, grayscale_image.shape[0]- (kernel_size//2), kernel_size//2):
+            for j in range(0, grayscale_image.shape[1]- (kernel_size//2), kernel_size//2):
                 # Take the current pixel and its neighboors to apply the thresholding algorithm on them
                 window = padded_image[i : i + kernel_size, j : j + kernel_size]
                 # If all the pixels belong to the same class (single intensity level), assign them all to background class
                 # we do so for simplicity since this often happen in the background pixels in the local thresholding, it rarely happen that the whole window has single
                 # intensity in the object pixels
                 if np.all(window == window[0, 0]):
-                    thresholded_image[i, j] = 255
+                    thresholded_image[i: i+(kernel_size//2), j:j+(kernel_size//2)] = 255
                     thresholded_window = window
                 else:
                     # Assign the value of the middle pixel of the thresholded window to the current pixel of the thresholded image
                     thresholded_window, _, _ = threshold_algorithm(window)
                     thresholded_image[
-                        i : i + kernel_size // 2, j : j + kernel_size // 2
+                        i : i + (kernel_size // 2), j : j + (kernel_size // 2)
                     ] = thresholded_window[: kernel_size // 2, : kernel_size // 2]
-        return thresholded_image
 
+        return thresholded_image
     def generate_combinations(self, k, step, start=1, end=255):
         """
         Generate proper combinations of thresholds for histogram bins based on the number of thresholds
