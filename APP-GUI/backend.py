@@ -292,6 +292,8 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.rg_output = None
         self.rg_seeds = None
         self.rg_threshold = 20
+        self.rg_window_size = 3
+        self.ui.window_size_spinbox.valueChanged.connect(self.update_rg_window_size)
         self.ui.region_growing_input_figure.canvas.mpl_connect(
             "button_press_event", self.rg_canvas_clicked
         )
@@ -311,6 +313,10 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.agglo_number_of_clusters = 2
         self.downsampling = False
         self.agglo_scale_factor = 4
+        self.distance_calculation_method = "distance between centroids"
+        self.ui.distance_calculation_method_combobox.currentIndexChanged.connect(
+            self.get_agglomerative_parameters
+        )
         self.agglo_initial_num_of_clusters = 25
         self.ui.apply_agglomerative.setEnabled(False)
         self.ui.apply_agglomerative.clicked.connect(self.apply_agglomerative_clustering)
@@ -1600,6 +1606,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.rg_threshold = self.ui.region_growing_threshold_slider.value()
         self.ui.region_growing_threshold.setText(f"Threshold: {self.rg_threshold}")
 
+    def update_rg_window_size(self):
+        self.rg_window_size = self.ui.window_size_spinbox.value()
+
     def apply_region_growing(self):
         """
         Perform region growing segmentation.
@@ -1613,7 +1622,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             numpy.ndarray: Segmented image.
         """
         # Initialize visited mask and segmented image
-
+        start = time.time()
         # 'visited' is initialized to keep track of which pixels have been visited (Mask)
         visited = np.zeros_like(self.rg_input_grayscale, dtype=bool)
         # 'segmented' will store the segmented image where each pixel belonging
@@ -1621,8 +1630,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         segmented = np.zeros_like(self.rg_input)
 
         # Define 3x3 window for mean calculation
-        window_size = 3
-        half_window = window_size // 2
+        half_window = self.rg_window_size // 2
 
         # Loop through seed points
         for seed in self.rg_seeds:
@@ -1684,8 +1692,17 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                                 ):
                                     queue.append((x + i, y + j))
 
+        self.display_image(
+            segmented,
+            self.ui.sift_output_figure_canvas,
+            "SIFT Output",
+            False,
+            False,
+            "off",
+        )
         self.plot_rg_output(segmented)
-        # self.display_image(segmented, self.ui.sift_output_figure_canvas, "SIFT Output")
+        end = time.time()
+        print(f"time = {end - start}")
 
     def plot_rg_output(self, segmented_image):
         ## =========== Display the segmented image =========== ##
@@ -1937,7 +1954,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
         self.mean_shift_luv = self.ui.mean_shift_LUV_conversion.isChecked()
 
-    def mean_shift_clusters(self, image, window_size, threshold, sigma):
+    def mean_shift_clusters(
+        self, image, window_size, threshold, sigma, max_iterations=100
+    ):
         """
         Perform Mean Shift clustering on an image.
 
@@ -1964,9 +1983,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         num_points = len(img_as_features)
         visited = np.full(num_points, False, dtype=bool)
         clusters = []
-
+        iteration_number = 0
         while (
-            np.sum(visited) < num_points
+            np.sum(visited) < num_points and iteration_number < max_iterations
         ):  # check if all points have been visited, thus, assigned a cluster.
             initial_mean_idx = np.random.choice(
                 np.arange(num_points)[np.logical_not(visited)]
@@ -2018,6 +2037,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     break
 
                 initial_mean = new_mean
+            iteration_number += 1
 
         return clusters
 
@@ -2416,8 +2436,15 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.ui.initial_num_of_clusters_label.setText(
             "Initial Number of Clusters: " + str(self.agglo_initial_num_of_clusters)
         )
+        self.distance_calculation_method = (
+            self.ui.distance_calculation_method_combobox.currentText()
+        )
 
     def downsample_image(self):
+        """
+        Description:
+            -   Downsample the input image using nearest neighbor interpolation.
+        """
         # Get the dimensions of the original image
         height, width, channels = self.agglo_input_image.shape
 
@@ -2438,6 +2465,11 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         return downsampled_image
 
     def agglo_reshape_image(self, image):
+        """
+        Description:
+            -   It creates an array with each row corresponds to a pixel
+                and each column corresponds to a color channel (R, G, B)
+        """
         pixels = image.reshape((-1, 3))
         return pixels
 
@@ -2475,13 +2507,15 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
     def initial_clusters(self, points, initial_k=25):
         """
-        partition pixels into self.initial_k groups based on color similarity
+        Description:
+            -   It partitions pixels into self.initial_k groups based on color similarity
         """
         # Initialize a dictionary to hold the clusters each represented by:
-        # the centroid color as a key
-        # and the list of pixels that belong to that cluster as a value
+        # The key: the centroid color.
+        # The value: the list of pixels that belong to that cluster.
         groups = {}
         # Defining the partitioning step
+        # 256 is the maximum value for a color channel
         d = int(256 / (initial_k))
         # Iterate over the range of initial clusters and assign the centroid colors for each cluster.
         # The centroid colors are determined by the multiples of the step size (d) ranging from 0 to 255.
@@ -2490,9 +2524,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         for i in range(initial_k):
             j = i * d
             groups[(j, j, j)] = []
-        # These lines iterate over each pixel in the image represented by the points array.
         # It calculates the Euclidean distance between the current pixel p and each centroid color (c)
-        # using the euclidean_distance function. It then assigns the pixel p to the cluster with the closest centroid color.
+        # It then assigns the pixel p to the cluster with the closest centroid color.
+        # grops.keys() returns the list of centroid colors.
         # The min function with a custom key function (lambda c: euclidean_distance(p, c)) finds the centroid color with the minimum distance to the pixel p,
         # and the pixel p is appended to the corresponding cluster in the groups dictionary.
         for i, p in enumerate(points):
@@ -2500,13 +2534,12 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 print("processing pixel:", i)
             go = min(groups.keys(), key=lambda c: self.euclidean_distance(p, c))
             groups[go].append(p)
-        # This line returns a list of pixel groups (clusters) where each group contains
+        # The function then returns a list of pixel groups (clusters) where each group contains
         # the pixels belonging to that cluster.
         # It filters out any empty clusters by checking the length of each cluster list.
         return [g for g in groups.values() if len(g) > 0]
 
     def fit_clusters(self, points):
-
         # initially, assign each point to a distinct cluster
         print("Computing initial clusters ...")
         self.clusters_list = self.initial_clusters(
@@ -2516,16 +2549,25 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         print("merging clusters ...")
 
         while len(self.clusters_list) > self.agglo_number_of_clusters:
-
             # Find the closest (most similar) pair of clusters
-            cluster1, cluster2 = min(
-                [
-                    (c1, c2)
-                    for i, c1 in enumerate(self.clusters_list)
-                    for c2 in self.clusters_list[:i]
-                ],
-                key=lambda c: self.clusters_distance_2(c[0], c[1]),
-            )
+            if self.distance_calculation_method == "distance between centroids":
+                cluster1, cluster2 = min(
+                    [
+                        (c1, c2)
+                        for i, c1 in enumerate(self.clusters_list)
+                        for c2 in self.clusters_list[:i]
+                    ],
+                    key=lambda c: self.clusters_distance_2(c[0], c[1]),
+                )
+            else:
+                cluster1, cluster2 = min(
+                    [
+                        (c1, c2)
+                        for i, c1 in enumerate(self.clusters_list)
+                        for c2 in self.clusters_list[:i]
+                    ],
+                    key=lambda c: self.clusters_distance(c[0], c[1]),
+                )
 
             # Remove the two clusters from the clusters list
             self.clusters_list = [

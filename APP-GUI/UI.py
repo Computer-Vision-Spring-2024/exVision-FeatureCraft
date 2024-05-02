@@ -264,13 +264,28 @@ class Ui_MainWindow(object):
         self.region_growing_threshold_slider.setMinimum(1)
         self.region_growing_threshold_slider.setMaximum(100)
         self.horizontalLayout_16.addWidget(self.region_growing_threshold_slider)
+
+        self.window_size_HLayout = QtWidgets.QHBoxLayout()
+        self.window_size_HLayout.setObjectName("window-size-hlayout")
+        self.window_size_label = QtWidgets.QLabel(self.tab_4)
+        self.window_size_label.setObjectName("window_size_label")
+        self.window_size_spinbox = OddSpinBox(self.tab_4)
+        self.window_size_spinbox.setObjectName("window_size_spinbox")
+        self.window_size_spinbox.setValue(3)
+        self.window_size_spinbox.setSingleStep(2)
+        self.window_size_spinbox.setMinimum(3)
+        self.window_size_spinbox.setMaximum(21)
+        self.window_size_HLayout.addWidget(self.window_size_label)
+        self.window_size_HLayout.addWidget(self.window_size_spinbox)
+
+        self.horizontalLayout_15.addLayout(self.window_size_HLayout)
         self.horizontalLayout_15.addLayout(self.horizontalLayout_16)
         self.reset_region_growing = QtWidgets.QPushButton(self.tab_4)
         self.reset_region_growing.setObjectName("Reset")
         self.apply_region_growing = QtWidgets.QPushButton(self.tab_4)
         self.apply_region_growing.setObjectName("apply_region_growing")
-        self.horizontalLayout_15.addWidget(self.reset_region_growing)
         self.horizontalLayout_15.addWidget(self.apply_region_growing)
+        self.horizontalLayout_15.addWidget(self.reset_region_growing)
         self.verticalLayout_5.addLayout(self.horizontalLayout_15)
         self.tabWidget.addTab(self.tab_4, "")
         self.tab_5 = QtWidgets.QWidget()
@@ -338,8 +353,8 @@ class Ui_MainWindow(object):
         self.verticalLayout_13 = QtWidgets.QVBoxLayout()
         self.verticalLayout_13.setObjectName("horizontalLayout_19")
 
-        self.verticalLayout_global_thresholds = QtWidgets.QHBoxLayout()
-        self.verticalLayout_global_thresholds.setObjectName("horizontalLayout_37")
+        self.sampling_HLayout = QtWidgets.QHBoxLayout()
+        self.sampling_HLayout.setObjectName("horizontalLayout_37")
         self.downsampling = QtWidgets.QCheckBox(self.tab_5)
         self.downsampling.setObjectName("downsampling")
 
@@ -350,12 +365,34 @@ class Ui_MainWindow(object):
         self.agglo_scale_factor.setMinimum(2)
         self.agglo_scale_factor.setMaximum(10)
 
-        self.verticalLayout_global_thresholds.addWidget(self.downsampling)
-        self.verticalLayout_global_thresholds.addWidget(self.agglo_scale_factor)
+        self.sampling_HLayout.addWidget(self.downsampling)
+        self.sampling_HLayout.addWidget(self.agglo_scale_factor)
+
+        self.distance_calculation_method = QtWidgets.QHBoxLayout()
+        self.distance_calculation_method.setObjectName("distance_calculation_method")
+        self.distance_calculation_method_label = QtWidgets.QLabel(self.tab_5)
+        self.distance_calculation_method_label.setObjectName(
+            "distance_calculation_method_label"
+        )
+
+        self.distance_calculation_method_combobox = QtWidgets.QComboBox(self.tab_5)
+        self.distance_calculation_method_combobox.setObjectName(
+            "distance_calculation_method_combobox"
+        )
+        self.distance_calculation_method_combobox.addItem("distance between centroids")
+        self.distance_calculation_method_combobox.addItem("max distance between pixels")
+
+        self.distance_calculation_method.addWidget(
+            self.distance_calculation_method_label
+        )
+        self.distance_calculation_method.addWidget(
+            self.distance_calculation_method_combobox
+        )
 
         self.apply_agglomerative = QtWidgets.QPushButton(self.tab_5)
         self.apply_agglomerative.setObjectName("apply_agglomerative")
-        self.verticalLayout_13.addLayout(self.verticalLayout_global_thresholds)
+        self.verticalLayout_13.addLayout(self.sampling_HLayout)
+        self.verticalLayout_13.addLayout(self.distance_calculation_method)
         self.verticalLayout_13.addWidget(self.apply_agglomerative)
         self.horizontalLayout_36.addLayout(self.verticalLayout_13)
         self.verticalLayout_6.addLayout(self.horizontalLayout_36)
@@ -841,6 +878,7 @@ class Ui_MainWindow(object):
             _translate("MainWindow", "Apply Region Growing")
         )
         self.reset_region_growing.setText(_translate("MainWindow", "Reset"))
+        self.window_size_label.setText(_translate("MainWindow", "Window Size"))
         self.tabWidget.setTabText(
             self.tabWidget.indexOf(self.tab_4),
             _translate("MainWindow", "Region Growing"),
@@ -851,6 +889,9 @@ class Ui_MainWindow(object):
         self.downsampling.setText(_translate("MainWindow", "Downsample the image"))
         self.apply_agglomerative.setText(
             _translate("MainWindow", "Apply Agglomerative Clustering")
+        )
+        self.distance_calculation_method_label.setText(
+            _translate("MainWindow", "Distance Calculation Method")
         )
         self.agglo_elapsed_time.setText(_translate("MainWindow", "Elapsed Time is"))
         self.tabWidget.setTabText(
@@ -919,6 +960,14 @@ class Ui_MainWindow(object):
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.actionLoad_Image.setText(_translate("MainWindow", "Load Image"))
 
+class OddSpinBox(QtWidgets.QSpinBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.editingFinished.connect(self.adjustValue)
+
+    def adjustValue(self):
+        if self.value() % 2 == 0:
+            self.setValue(self.value() + 1)
 
 if __name__ == "__main__":
     import sys
