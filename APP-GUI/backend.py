@@ -2245,7 +2245,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     thresholded_window, _, _ = threshold_algorithm(window)
                     thresholded_image[
                         i : i + (kernel_size // 2), j : j + (kernel_size // 2)
-                    ] = thresholded_window[(kernel_size//2)+1: ,(kernel_size//2)+1:]
+                    ] = thresholded_window[(kernel_size//2): -1 ,(kernel_size//2):-1]
 
         return thresholded_image
 
