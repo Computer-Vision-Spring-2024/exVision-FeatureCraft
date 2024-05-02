@@ -2265,7 +2265,9 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     thresholded_window, _, _ = threshold_algorithm(window)
                     thresholded_image[
                         i : i + (kernel_size // 2), j : j + (kernel_size // 2)
-                    ] = thresholded_window[(kernel_size//2): -1 ,(kernel_size//2):-1]
+                    ] = thresholded_window[
+                        (kernel_size // 2) : -1, (kernel_size // 2) : -1
+                    ]
 
         return thresholded_image
 
@@ -2481,7 +2483,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         """
         return np.linalg.norm(np.array(point1) - np.array(point2))
 
-    def clusters_distance(self, cluster1, cluster2):
+    def max_clusters_distance_between_points(self, cluster1, cluster2):
         """
         Description:
             -   Computes distance between two clusters.
@@ -2495,7 +2497,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
             ]
         )
 
-    def clusters_distance_2(self, cluster1, cluster2):
+    def clusters_distance_between_centroids(self, cluster1, cluster2):
         """
         Description:
             -   Computes distance between two centroids of the two clusters
@@ -2505,7 +2507,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         cluster2_center = np.average(cluster2, axis=0)
         return self.euclidean_distance(cluster1_center, cluster2_center)
 
-    def initial_clusters(self, points, initial_k=25):
+    def partition_pixel_into_clusters(self, points, initial_k=25):
         """
         Description:
             -   It partitions pixels into self.initial_k groups based on color similarity
@@ -2513,7 +2515,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         # Initialize a dictionary to hold the clusters each represented by:
         # The key: the centroid color.
         # The value: the list of pixels that belong to that cluster.
-        groups = {}
+        initial_clusters = {}
         # Defining the partitioning step
         # 256 is the maximum value for a color channel
         d = int(256 / (initial_k))
@@ -2523,7 +2525,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         # ensuring even distribution across the color space.
         for i in range(initial_k):
             j = i * d
-            groups[(j, j, j)] = []
+            initial_clusters[(j, j, j)] = []
         # It calculates the Euclidean distance between the current pixel p and each centroid color (c)
         # It then assigns the pixel p to the cluster with the closest centroid color.
         # grops.keys() returns the list of centroid colors.
@@ -2532,17 +2534,19 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         for i, p in enumerate(points):
             if i % 100000 == 0:
                 print("processing pixel:", i)
-            go = min(groups.keys(), key=lambda c: self.euclidean_distance(p, c))
-            groups[go].append(p)
+            nearest_group_key = min(
+                initial_clusters.keys(), key=lambda c: self.euclidean_distance(p, c)
+            )
+            initial_clusters[nearest_group_key].append(p)
         # The function then returns a list of pixel groups (clusters) where each group contains
         # the pixels belonging to that cluster.
         # It filters out any empty clusters by checking the length of each cluster list.
-        return [g for g in groups.values() if len(g) > 0]
+        return [g for g in initial_clusters.values() if len(g) > 0]
 
     def fit_clusters(self, points):
         # initially, assign each point to a distinct cluster
         print("Computing initial clusters ...")
-        self.clusters_list = self.initial_clusters(
+        self.clusters_list = self.partition_pixel_into_clusters(
             points, initial_k=self.agglo_initial_num_of_clusters
         )
         print("number of initial clusters:", len(self.clusters_list))
@@ -2557,7 +2561,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                         for i, c1 in enumerate(self.clusters_list)
                         for c2 in self.clusters_list[:i]
                     ],
-                    key=lambda c: self.clusters_distance_2(c[0], c[1]),
+                    key=lambda c: self.clusters_distance_between_centroids(c[0], c[1]),
                 )
             else:
                 cluster1, cluster2 = min(
@@ -2566,7 +2570,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                         for i, c1 in enumerate(self.clusters_list)
                         for c2 in self.clusters_list[:i]
                     ],
-                    key=lambda c: self.clusters_distance(c[0], c[1]),
+                    key=lambda c: self.max_clusters_distance_between_points(c[0], c[1]),
                 )
 
             # Remove the two clusters from the clusters list
@@ -2584,27 +2588,27 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
         print("assigning cluster num to each point ...")
         self.cluster = {}
-        for cl_num, cl in enumerate(self.clusters_list):
-            for point in cl:
-                self.cluster[tuple(point)] = cl_num
+        for cluster_number, cluster in enumerate(self.clusters_list):
+            for point in cluster:
+                self.cluster[tuple(point)] = cluster_number
 
         print("Computing cluster centers ...")
         self.centers = {}
-        for cl_num, cl in enumerate(self.clusters_list):
-            self.centers[cl_num] = np.average(cl, axis=0)
+        for cluster_number, cluster in enumerate(self.clusters_list):
+            self.centers[cluster_number] = np.average(cluster, axis=0)
 
-    def predict_cluster(self, point):
+    def get_cluster_number(self, point):
         """
         Find cluster number of point
         """
         # assuming point belongs to clusters that were computed by fit functions
         return self.cluster[tuple(point)]
 
-    def predict_center(self, point):
+    def get_cluster_center(self, point):
         """
         Find center of the cluster that point belongs to
         """
-        point_cluster_num = self.predict_cluster(point)
+        point_cluster_num = self.get_cluster_number(point)
         center = self.centers[point_cluster_num]
         return center
 
@@ -2619,7 +2623,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         self.fit_clusters(pixels)
 
         self.agglo_output_image = [
-            [self.predict_center(pixel) for pixel in row]
+            [self.get_cluster_center(pixel) for pixel in row]
             for row in agglo_downsampled_image
         ]
         self.agglo_output_image = np.array(self.agglo_output_image, np.uint8)

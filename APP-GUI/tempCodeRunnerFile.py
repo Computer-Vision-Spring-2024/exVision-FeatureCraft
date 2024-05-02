@@ -1,1 +1,0 @@
-verticalLayout_global_thresholds
