@@ -17,3 +17,10 @@
 - Implementation https://medium.com/@russmislam/implementing-sift-in-python-a-complete-guide-part-1-306a99b50aa5
 - Implementation https://lerner98.medium.com/implementing-sift-in-python-36c619df7945
 
+## K-means and mean shift
+    - K-means: https://www.youtube.com/watch?v=22mpExWh1LY&list=PL2zRqk16wsdop2EatuowXBX5C-r2FdyNt&index=4
+    - Mean shift: https://www.youtube.com/watch?v=PCNz_zttmtA
+
+## Thresholding
+    - Chapter 10, part 3, mainly equations ([10-46: 10-64] & [10:66 : 10-77]): https://drive.google.com/file/d/1jj44UGbO4xumN2xr5NYtccXps-v3sg-6/view
+
