@@ -9,8 +9,6 @@ from math import sin, cos
 import time
 
 
-
-
 def gaussian_filter_kernel(sigma, kernel_size = None):
         """
         Description:
