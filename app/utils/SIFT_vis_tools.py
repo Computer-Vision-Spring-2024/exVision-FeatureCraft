@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
-    
 
-def visualize_pyramid(self, pyramid):
+
+def visualize_pyramid(pyramid):
     fig, axes = plt.subplots(
         nrows=len(pyramid), ncols=len(pyramid[0]), figsize=(12, 12)
     )
@@ -16,7 +16,8 @@ def visualize_pyramid(self, pyramid):
     plt.tight_layout()
     plt.show()
 
-def visualize_DOC_for_octave(self, DOG):
+
+def visualize_DOC_for_octave(DOG):
     fig, axes = plt.subplots(nrows=len(DOG), ncols=len(DOG[0]), figsize=(12, 12))
 
     for i in range(len(DOG)):
@@ -28,7 +29,8 @@ def visualize_DOC_for_octave(self, DOG):
     plt.tight_layout()
     plt.show()
 
-def visualize_keypoints(self, pyramid, keypoints):
+
+def visualize_keypoints(pyramid, keypoints):
     fig, axes = plt.subplots(
         nrows=len(pyramid), ncols=len(pyramid[0]), figsize=(12, 12)
     )

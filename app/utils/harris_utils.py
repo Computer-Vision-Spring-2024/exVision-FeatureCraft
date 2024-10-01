@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 
 
 def convert_to_gray(img_RGB: np.ndarray) -> np.ndarray:
@@ -7,7 +7,6 @@ def convert_to_gray(img_RGB: np.ndarray) -> np.ndarray:
         return grey.astype(np.uint8)
     else:
         return img_RGB.astype(np.uint8)
-
 
 
 def padding_matrix(matrix, width, height, pad_size):
@@ -79,4 +78,3 @@ def convolve2d_optimized(input_matrix, convolution_kernel, mode="same"):
     output_matrix = np.sum(convolution_regions * convolution_kernel, axis=(2, 3))
 
     return output_matrix
-

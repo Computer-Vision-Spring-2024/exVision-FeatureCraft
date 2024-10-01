@@ -1,7 +1,5 @@
 # backend.py
 import os
-import random
-from itertools import combinations
 
 import numpy as np
 
@@ -12,45 +10,17 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 import time
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 
 # in CMD: pip install qdarkstyle -> pip install pyqtdarktheme
 import qdarktheme
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-from PIL import Image
 from PyQt5 import QtGui
+from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
 
-# imports
-from PyQt5.QtWidgets import (
-    QApplication,
-    QFileDialog,
-    QMainWindow,
-    QMessageBox,
-    QVBoxLayout,
-)
-
-# from scipy.signal import convolve2d
-from skimage.transform import rescale, resize
-
-# from task3_ui import Ui_MainWindow
-from UI import Ui_MainWindow
-from Harris_utils import *
-from keypoint_descriptor import *
-
-# Helper functions
-def convert_to_gray(img_RGB: np.ndarray) -> np.ndarray:
-    if len(img_RGB.shape) == 3:
-        grey = np.dot(img_RGB[..., :3], [0.2989, 0.5870, 0.1140])
-        return grey.astype(np.uint8)
-    else:
-        return img_RGB.astype(np.uint8)
-
-
-def convert_BGR_to_RGB(img_BGR_nd_arr: np.ndarray) -> np.ndarray:
-    img_RGB_nd_arr = img_BGR_nd_arr[..., ::-1]
-    return img_RGB_nd_arr
+from FeatureCraft_UI import Ui_MainWindow
+from utils.harris_utils import *
+from utils.helper_functions import *
+from utils.keypoint_descriptor import *
 
 
 class BackendClass(QMainWindow, Ui_MainWindow):
@@ -110,8 +80,11 @@ class BackendClass(QMainWindow, Ui_MainWindow):
         # Connect menu action to load_image
         self.ui.actionLoad_Image.triggered.connect(self.load_image)
 
+        # Set the icon and title
+        self.change_the_icon()
+
     def change_the_icon(self):
-        self.setWindowIcon(QtGui.QIcon("Figs/App_Icon.png"))
+        self.setWindowIcon(QtGui.QIcon("assets/icons/app_icon.png"))
         self.setWindowTitle("exVision-FeatureCraft")
 
     def load_image(self):
@@ -152,7 +125,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                     and self.sift_template_image is not None
                 ):
                     self.ui.apply_sift.setEnabled(True)
-           
+
             # Deactivate the slider and disconnect from apply harris function
             self.ui.horizontalSlider_corner_tab.setEnabled(False)
             try:

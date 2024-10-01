@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.signal import convolve2d
 
-def gaussian_filter_kernel( sigma, kernel_size=None):
+
+def gaussian_filter_kernel(sigma, kernel_size=None):
     """
     Description:
         - Generates a Gaussian filter kernel.
@@ -29,7 +30,7 @@ def gaussian_filter_kernel( sigma, kernel_size=None):
     return kernel
 
 
-def generateGaussianKernels( sigma, s):
+def generateGaussianKernels(sigma, s):
     """
     Description:
         - Generates the required Gaussian Kernels for generating different scales for each octave.
@@ -56,7 +57,7 @@ def generateGaussianKernels( sigma, s):
     return gaussian_kernels
 
 
-def get_keypoints(DOG_octave, k, contrast_th, ratio_th, DoG_full_array):
+def get_keypoints(DOG_octave, k):
     """
     Description:
         - from each three difference of gaussians images, detect possible keypoints through extrema detection which is done by comparing the middle pixel with
@@ -105,9 +106,8 @@ def get_keypoints(DOG_octave, k, contrast_th, ratio_th, DoG_full_array):
     return np.array(keypoints)
 
 
-
 def generate_gaussian_images_in_octave(
-        image, gaussian_kernels, contrast_th, ratio_th, octave_index
+    image, gaussian_kernels, contrast_th, ratio_th, octave_index
 ):
     """
     Description:
@@ -144,9 +144,7 @@ def generate_gaussian_images_in_octave(
         blurred_image = convolve2d(image, gaussian_kernel, "same", "symm")
         gaussian_images_in_octave.append(blurred_image)
         # subtract each two adjacent images and add the result to the difference of gaussians of the octave
-        DOG_octave.append(
-            gaussian_images_in_octave[-1] - gaussian_images_in_octave[-2]
-        )
+        DOG_octave.append(gaussian_images_in_octave[-1] - gaussian_images_in_octave[-2])
         if len(DOG_octave) > 2:
             # from each three difference of gaussians images, detect possible keypoints through extrema detection then applying keypoints localization
             # and filtering to discarde unstable keypoints
@@ -156,18 +154,15 @@ def generate_gaussian_images_in_octave(
                     len(DOG_octave) - 2,
                     contrast_th,
                     ratio_th,
-                    np.concatenate(
-                        [o[:, :, np.newaxis] for o in DOG_octave], axis=2
-                    ),
+                    np.concatenate([o[:, :, np.newaxis] for o in DOG_octave], axis=2),
                 )
             )
     return gaussian_images_in_octave, DOG_octave, keypoints
 
 
-
-
 def generate_octaves_pyramid(
-    img, num_octaves=4, s_value=2, sigma=1.6, contrast_th=0.03, ratio_th=10):
+    img, num_octaves=4, s_value=2, sigma=1.6, contrast_th=0.03, ratio_th=10
+):
     """
     Description:
         - Generates the gaussian pyramid which consists of several octaves with increasingly blurred images.
@@ -216,51 +211,51 @@ def generate_octaves_pyramid(
 
 
 def localize_keypoint(D, x, y, s):
-        """
-        Description:
-            - refining the detected keypoints to sub-pixel accuracy. This is done by fitting a 3D quadratic function
-                to the nearby data to determine the interpolated location of the maximum, In SIFT the second-order Taylor expansion of the DoG octave is used
+    """
+    Description:
+        - refining the detected keypoints to sub-pixel accuracy. This is done by fitting a 3D quadratic function
+            to the nearby data to determine the interpolated location of the maximum, In SIFT the second-order Taylor expansion of the DoG octave is used
 
-        Args:
-            - D: difference of gaussians stacked along the depth dimention
-            - x: the x coordinate of the keypoint.
-            - y: the y coordinate of the keypoint
-            - s: the depth of the keypoint.
+    Args:
+        - D: difference of gaussians stacked along the depth dimention
+        - x: the x coordinate of the keypoint.
+        - y: the y coordinate of the keypoint
+        - s: the depth of the keypoint.
 
-        Returns:
-            - offset: the final offset that should be added to the location of the keypoint to get the interpolated estimate for the location of the keypoint
-            - J: the first derivatives of D, These derivatives represent the rate of change of difference of gaussians intensity in each direction.
-            - H[:2,:2]: the second derivatives (Hessian matrix) of the image intensity at the specified point.
-                The Hessian matrix represents the local curvature or second-order rate of change of image intensity.
-            - x: the x coordinate of the keypoint after further localization.
-            - y: the y coordinate of the keypoint after further localization.
-            - s: the depth of the keypoint after further localization..
-        """
-        # convert D to larger data type (float) to avoid overflow
-        D = D.astype(np.float64)
-        # computes the first derivatives (gradient) of the image intensity along the x, y, and scale dimensions at the specified point (x, y, s).
-        dx = (D[y, x + 1, s] - D[y, x - 1, s]) / 2.0
-        dy = (D[y + 1, x, s] - D[y - 1, x, s]) / 2.0
-        ds = (D[y, x, s + 1] - D[y, x, s - 1]) / 2.0
-        # computes the second derivatives (Hessian matrix) of the image intensity at the keypoint.
-        dxx = D[y, x + 1, s] - 2 * D[y, x, s] + D[y, x - 1, s]
-        dxy = (
-            (D[y + 1, x + 1, s] - D[y + 1, x - 1, s])
-            - (D[y - 1, x + 1, s] - D[y - 1, x - 1, s])
-        ) / 4
-        dxs = (
-            (D[y, x + 1, s + 1] - D[y, x - 1, s + 1])
-            - (D[y, x + 1, s - 1] - D[y, x - 1, s - 1])
-        ) / 4
-        dyy = D[y + 1, x, s] - 2 * D[y, x, s] + D[y - 1, x, s]
-        dys = (
-            (D[y + 1, x, s + 1] - D[y - 1, x, s + 1])
-            - (D[y + 1, x, s - 1] - D[y - 1, x, s - 1])
-        ) / 4
-        dss = D[y, x, s + 1] - 2 * D[y, x, s] + D[y, x, s - 1]
-        J = np.array([dx, dy, ds])
-        # the second derivatives (Hessian matrix) of the image intensity at the specified point.
-        H = np.array([[dxx, dxy, dxs], [dxy, dyy, dys], [dxs, dys, dss]])
-        # the final offset that should be added to the location of the keypoint to get the interpolated estimate for the location of the keypoint
-        offset = -np.linalg.inv(H).dot(J)  # ((3 x 3) . 3 x 1)
-        return offset, J, H[:2, :2], x, y, s
+    Returns:
+        - offset: the final offset that should be added to the location of the keypoint to get the interpolated estimate for the location of the keypoint
+        - J: the first derivatives of D, These derivatives represent the rate of change of difference of gaussians intensity in each direction.
+        - H[:2,:2]: the second derivatives (Hessian matrix) of the image intensity at the specified point.
+            The Hessian matrix represents the local curvature or second-order rate of change of image intensity.
+        - x: the x coordinate of the keypoint after further localization.
+        - y: the y coordinate of the keypoint after further localization.
+        - s: the depth of the keypoint after further localization..
+    """
+    # convert D to larger data type (float) to avoid overflow
+    D = D.astype(np.float64)
+    # computes the first derivatives (gradient) of the image intensity along the x, y, and scale dimensions at the specified point (x, y, s).
+    dx = (D[y, x + 1, s] - D[y, x - 1, s]) / 2.0
+    dy = (D[y + 1, x, s] - D[y - 1, x, s]) / 2.0
+    ds = (D[y, x, s + 1] - D[y, x, s - 1]) / 2.0
+    # computes the second derivatives (Hessian matrix) of the image intensity at the keypoint.
+    dxx = D[y, x + 1, s] - 2 * D[y, x, s] + D[y, x - 1, s]
+    dxy = (
+        (D[y + 1, x + 1, s] - D[y + 1, x - 1, s])
+        - (D[y - 1, x + 1, s] - D[y - 1, x - 1, s])
+    ) / 4
+    dxs = (
+        (D[y, x + 1, s + 1] - D[y, x - 1, s + 1])
+        - (D[y, x + 1, s - 1] - D[y, x - 1, s - 1])
+    ) / 4
+    dyy = D[y + 1, x, s] - 2 * D[y, x, s] + D[y - 1, x, s]
+    dys = (
+        (D[y + 1, x, s + 1] - D[y - 1, x, s + 1])
+        - (D[y + 1, x, s - 1] - D[y - 1, x, s - 1])
+    ) / 4
+    dss = D[y, x, s + 1] - 2 * D[y, x, s] + D[y, x, s - 1]
+    J = np.array([dx, dy, ds])
+    # the second derivatives (Hessian matrix) of the image intensity at the specified point.
+    H = np.array([[dxx, dxy, dxs], [dxy, dyy, dys], [dxs, dys, dss]])
+    # the final offset that should be added to the location of the keypoint to get the interpolated estimate for the location of the keypoint
+    offset = -np.linalg.inv(H).dot(J)  # ((3 x 3) . 3 x 1)
+    return offset, J, H[:2, :2], x, y, s

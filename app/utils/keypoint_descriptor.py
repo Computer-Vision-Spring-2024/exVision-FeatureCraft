@@ -1,9 +1,10 @@
-import numpy as np 
-from skimage.transform import resize, rescale
-from scipy.signal import convolve2d
-from SIFT_scale_space import *
-import cv2
 from math import cos, sin
+
+import cv2
+import numpy as np
+from scipy.signal import convolve2d
+from skimage.transform import rescale, resize
+from utils.SIFT_scale_space import *
 
 
 def sift_resize(img, ratio=None):
@@ -24,9 +25,7 @@ def sift_resize(img, ratio=None):
     - `anti_aliasing=True` is used to smooth the edges of the resized image.
     """
     ratio = (
-        ratio
-        if ratio is not None
-        else np.sqrt((1024 * 1024) / np.prod(img.shape[:2]))
+        ratio if ratio is not None else np.sqrt((1024 * 1024) / np.prod(img.shape[:2]))
     )
     newshape = list(map(lambda d: int(round(d * ratio)), img.shape[:2]))
     img = resize(img, newshape, anti_aliasing=True)
@@ -68,6 +67,7 @@ def represent_keypoints(keypoints, DoG):
         keypoints_as_images.append(keypoints_per_octave)
     return keypoints_as_images
 
+
 def sift_gradient(img):
     dx = np.array([-1, 0, 1]).reshape((1, 3))
     dy = dx.T
@@ -76,6 +76,7 @@ def sift_gradient(img):
     magnitude = np.sqrt(gx * gx + gy * gy)
     direction = np.rad2deg(np.arctan2(gy, gx)) % 360  # to wrap the direction
     return gx, gy, magnitude, direction
+
 
 def padded_slice(img, sl):
     """
@@ -111,10 +112,7 @@ def padded_slice(img, sl):
     return output
 
 
-
-def dog_keypoints_orientations(
-    img_gaussians, keypoints, sigma_base, num_bins=36, s=2
-):
+def dog_keypoints_orientations(img_gaussians, keypoints, sigma_base, num_bins=36, s=2):
     """Assigns the dominant orientation of the keypoint"""
 
     kps = []
@@ -173,7 +171,6 @@ def dog_keypoints_orientations(
     return kps
 
 
-
 def rotated_subimage(image, center, theta, width, height):
     """
     Rotate a subimage around a specified center point by a given angle.
@@ -214,16 +211,12 @@ def rotated_subimage(image, center, theta, width, height):
     )
 
 
-
 def get_gaussian_mask(sigma, filter_size):
     if sigma > 0:
         kernel = np.fromfunction(
             lambda x, y: (1 / (2 * np.pi * sigma**2))
             * np.exp(
-                -(
-                    (x - (filter_size - 1) / 2) ** 2
-                    + (y - (filter_size - 1) / 2) ** 2
-                )
+                -((x - (filter_size - 1) / 2) ** 2 + (y - (filter_size - 1) / 2) ** 2)
                 / (2 * sigma**2)
             ),
             (filter_size, filter_size),
@@ -233,10 +226,7 @@ def get_gaussian_mask(sigma, filter_size):
         raise ValueError("Invalid value of Sigma")
 
 
-
-def extract_sift_descriptors(
-     img_gaussians, keypoints, base_sigma, num_bins=8, s=2
-):
+def extract_sift_descriptors(img_gaussians, keypoints, base_sigma, num_bins=8, s=2):
     """Extract the 128 length descriptors of each keypoint besides their keypoint info (i ,j , oct_idx, scale_idx, orientation)"""
 
     descriptors = []
@@ -269,9 +259,7 @@ def extract_sift_descriptors(
             data["magnitude"], (j, i), orientation, 16, 16
         )  # rotation to align with the domianant orientation
         window_mag = window_mag * data["kernel"]
-        window_dir = rotated_subimage(
-            data["direction"], (j, i), orientation, 16, 16
-        )
+        window_dir = rotated_subimage(data["direction"], (j, i), orientation, 16, 16)
         window_dir = (((window_dir - orientation) % 360) * num_bins / 360.0).astype(
             int
         )  # subtract the dominant orientation to make it direction invariance
@@ -300,10 +288,8 @@ def extract_sift_descriptors(
     return points, descriptors
 
 
-
-
 def computeKeypointsAndDescriptors(
-     image, n_octaves, s_value, sigma_base, constract_th, r_ratio
+    image, n_octaves, s_value, sigma_base, constract_th, r_ratio
 ):
     grayscaled_image = convert_to_grayscale(image)  # convert to grayscale
     base_image = rescale(
@@ -324,8 +310,7 @@ def computeKeypointsAndDescriptors(
     return points, descriptors
 
 
-
-def kp_list_2_opencv_kp_list( kp_list):
+def kp_list_2_opencv_kp_list(kp_list):
     """represnet the keypoints as keyPoint objects"""
 
     opencv_kp_list = []
@@ -339,6 +324,7 @@ def kp_list_2_opencv_kp_list( kp_list):
         opencv_kp_list += [opencv_kp]
 
     return opencv_kp_list
+
 
 def match(img_a, pts_a, desc_a, img_b, pts_b, desc_b, tuning_distance=0.3):
     img_a, img_b = tuple(map(lambda i: np.uint8(i * 255), [img_a, img_b]))
