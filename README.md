@@ -7,16 +7,15 @@ FeatureCraft is a desktop application that leverages classical feature engineeri
 
 ### Corners Detection (Harris & Lambda-Minus)
 Corners are important features in image processing because they represent points where two edges meet, often providing distinctive, robust, rotation-invariant features for tasks like object detection and image matching. The Harris Corner Detection algorithm is a popular method for detecting such corners.
-1. **Harris Corner Detection:** This algorithm identifies corners by analyzing the local intensity gradients within an image. It computes the Harris matrix (also known as the structure tensor) at each pixel, based on image derivatives, to capture changes in intensity. The corner score, known as the Harris response, is calculated using an equation that considers eigenvalues of this matrix. A high response value indicates potential corner points.
+1. **Harris Corner Detection:** This algorithm identifies corners by analyzing the local intensity gradients within an image. It computes the Harris matrix (also known as the structure tensor) at each pixel, based on image derivatives, to capture changes in intensity. The corner score, known as the Harris response, is calculated using an equation that considers the eigenvalues of this matrix. A high response value indicates potential corner points.
 <p align="center">
   <img src="README-Assets\Harris_corners.png" alt="corner detection" width="500"/>
 </p>
 
 2. **Lambda-Minus:** The method uses the eigenvalues (λ1, λ2) of the Harris matrix to assess feature points:
-
-- If both eigenvalues are large, the point is likely a corner.
-- If one eigenvalue is large and the other is small, the point lies on an edge.
-- If both eigenvalues are small, the point is in a flat region.
+    - If both eigenvalues are large, the point is likely a corner.
+    - If one eigenvalue is large and the other is small, the point lies on an edge.
+    - If both eigenvalues are small, the point is in a flat region.
 
 <p align="center">
   <img src="README-Assets\harris-demo.jpg" alt="lambda-minus" width="300"/>
