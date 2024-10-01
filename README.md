@@ -1,26 +1,59 @@
-# Task-3 & Task-4
+# exVision: FeatureCraft
 
-## Moravec corner detection (Lambda Minus Method Mentioned in The Assignment)
+## Overview
+FeatureCraft is a desktop application that leverages classical feature engineering techniques to perform template matching, with a specific focus on extracting invariant features for template matching. The application incorporates the Scale-Invariant Feature Transform (SIFT) algorithm, various corner detection methods (e.g., the Harris Corner Detector), and a specialized technique called lambda-minus, all aimed at identifying robust features across different conditions, such as changes in scale, rotation, and illumination.
 
-- Article: https://medium.com/@itberrios6/harris-corner-and-edge-detector-4169312aa2f8#f9f0
-- Steps Explanation Quick Video: https://www.youtube.com/watch?v=X-XXOpoDYLU
-- A Github Implementation: https://github.com/thanif/moravecs_method/blob/main/moravecs_method.py
+## Feature Engineering Techniques
 
-## Harris Operator corner detection (Lambda Minus Method Mentioned in The Assignment)
+### Corners Detection (Harris & Lambda-Minus)
+Corners are important features in image processing because they represent points where two edges meet, often providing distinctive, robust, rotation-invariant features for tasks like object detection and image matching. The Harris Corner Detection algorithm is a popular method for detecting such corners.
+1. **Harris Corner Detection:** This algorithm identifies corners by analyzing the local intensity gradients within an image. It computes the Harris matrix (also known as the structure tensor) at each pixel, based on image derivatives, to capture changes in intensity. The corner score, known as the Harris response, is calculated using an equation that considers eigenvalues of this matrix. A high response value indicates potential corner points.
+<p align="center">
+  <img src="README-Assets\Harris_corners.png" alt="corner detection" width="400"/>
+</p>
 
-- Article + Implementation: https://www.geekering.com/programming-languages/python/brunorsilva/harris-corner-detector-python/
-- Video Comparing between the two that will be useful for the report part: https://www.youtube.com/watch?v=ihMmZvlvOko
-- Videos to Fully Understand The Concept beginning with sobel gradient: https://www.youtube.com/watch?v=PxzaXOd_nHs&list=PLyhJeMedQd9SljfbRUTLAtGQhB1zZQ23z These 3 & https://www.youtube.com/watch?v=RhxlypyC8GI
+2. **Lambda-Minus:** The method uses the eigenvalues (λ1, λ2) of the Harris matrix to assess feature points:
 
-## SIFT
-- Useful Paper with pseudocode https://www.ipol.im/pub/art/2014/82/
-- Implementation https://medium.com/@russmislam/implementing-sift-in-python-a-complete-guide-part-1-306a99b50aa5
-- Implementation https://lerner98.medium.com/implementing-sift-in-python-36c619df7945
+- If both eigenvalues are large, the point is likely a corner.
+- If one eigenvalue is large and the other is small, the point lies on an edge.
+- If both eigenvalues are small, the point is in a flat region.
 
-## K-means and mean shift
-- K-means https://www.youtube.com/watch?v=22mpExWh1LY&list=PL2zRqk16wsdop2EatuowXBX5C-r2FdyNt&index=4
-- Mean shift https://www.youtube.com/watch?v=PCNz_zttmtA
+<p align="center">
+  <img src="README-Assets\harris-demo.jpg" alt="lambda-minus" width="200"/>
+</p>
 
-## Thresholding
-- Chapter 10, part 3, mainly equations ([10-46: 10-64] & [10:66 : 10-77]): https://drive.google.com/file/d/1jj44UGbO4xumN2xr5NYtccXps-v3sg-6/view
+### Scale-and-Rotation-Invariant Blob Detection (SIFT) 
+The Scale-Invariant Feature Transform (SIFT) is used to detect and describe local features in images. It is robust to changes in scale, rotation, and illumination, making it ideal for matching key points across different images of the same object or scene. The SIFT algorithm works by:
 
+1. **Keypoint Detection:** Identifying potential points of interest, or "blobs," that remain stable under scale changes. This is done by detecting extrema in scale-space.
+
+2. **Keypoint Localization:** Refining the location and scale of each keypoint to improve accuracy.
+
+3. **Orientation Assignment:** Assigning a dominant orientation to each keypoint to ensure invariance to image rotation.
+
+4. **Keypoint Descriptor:** Generating a distinctive descriptor for each keypoint based on the local image gradient around it. This allows for reliable matching between keypoints in different images.
+
+## Template Matching using SIFT 
+
+By comparing the keypoint descirptors of the main image and template, we can map locate some objects in the main image. 
+
+
+
+<p align="center">
+  <img src="README-Assets\template_matching.png" alt="rotation invariance" width="400"/>
+</p>
+
+**For a more in-depth understanding of each each feature engineering technique, please refer to the attached notebooks and python scripts as well as the report.**
+
+
+## Acknowledgments
+
+- Refer to [this organization's README](https://github.com/Computer-Vision-Spring-2024#acknowledgements) for more details about contributors and supervisors. 
+
+## References 
+
+- Lowe, D. G. (2004). *Distinctive image features from scale-invariant keypoints*. Computer Science Department, University of British Columbia.
+
+- Otero, I. R., & Delbracio, M. (2014). *Anatomy of the SIFT method*. Image Processing On Line, 4, 370–396. 
+
+- "Corner detection." (n.d.). In *Wikipedia*. Retrieved from https://en.wikipedia.org/wiki/Corner_detection
