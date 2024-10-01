@@ -49,6 +49,7 @@ By comparing the keypoint descirptors of the main image and template, we can map
 ## Acknowledgments
 
 - Refer to [this organization's README](https://github.com/Computer-Vision-Spring-2024#acknowledgements) for more details about contributors and supervisors. 
+- "Corner detection." (n.d.). In *Wikipedia*. Retrieved from https://en.wikipedia.org/wiki/Corner_detection
 
 ## References 
 
@@ -56,4 +57,4 @@ By comparing the keypoint descirptors of the main image and template, we can map
 
 - Otero, I. R., & Delbracio, M. (2014). *Anatomy of the SIFT method*. Image Processing On Line, 4, 370–396. 
 
-- "Corner detection." (n.d.). In *Wikipedia*. Retrieved from https://en.wikipedia.org/wiki/Corner_detection
+
