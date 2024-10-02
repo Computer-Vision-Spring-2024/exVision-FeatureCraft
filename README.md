@@ -42,13 +42,22 @@ By comparing the keypoint descirptors of the main image and template, we can map
   <img src="README-Assets\images\template_matching.png" alt="rotation invariance" width="400"/>
 </p>
 
-**For a more in-depth understanding of each each feature engineering technique, please refer to the [attached notebooks and python scripts](implementation_without_ui) as well as [the project documentation](README-Assets\FeatureCraft-Documentation.pdf).**
+**For a more in-depth understanding of each each feature engineering technique, please refer to the [attached notebooks and python scripts](implementation_without_ui) as well as [the project documentation](README-Assets/FeatureCraft-Documentation.pdf).**
 
+## Getting Started
+
+To be able to use our app, you can simply follow these steps:
+1. Install Python3 on your device. You can download it from <a href="https://www.python.org/downloads/">Here</a>.
+2. Install the required packages by the following command.
+```
+pip install -r requirements.txt
+```
+3. Run the file with the name "FeatureCraft_Backend.py"
 
 ## Acknowledgments
 
 - Refer to [this organization's README](https://github.com/Computer-Vision-Spring-2024#acknowledgements) for more details about contributors and supervisors. 
-- "Corner detection." (n.d.). In *Wikipedia*. Retrieved from https://en.wikipedia.org/wiki/Corner_detection
+- "Corner detection." (n.d.). In *Wikipedia*. Retrieved from [Wiki](https://en.wikipedia.org/wiki/Corner_detection)
 
 ## References 
 
