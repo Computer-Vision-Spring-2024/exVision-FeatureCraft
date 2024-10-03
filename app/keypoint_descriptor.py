@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from scipy.signal import convolve2d
 from skimage.transform import rescale, resize
-from utils.SIFT_scale_space import *
+from SIFT_scale_space import *
 
 
 def sift_resize(img, ratio=None):

@@ -57,7 +57,7 @@ def generateGaussianKernels(sigma, s):
     return gaussian_kernels
 
 
-def get_keypoints(DOG_octave, k):
+def get_keypoints(DOG_octave, k,  contrast_th, ratio_th, DoG_full_array):
     """
     Description:
         - from each three difference of gaussians images, detect possible keypoints through extrema detection which is done by comparing the middle pixel with

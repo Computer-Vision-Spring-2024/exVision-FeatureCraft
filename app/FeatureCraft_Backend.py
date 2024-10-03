@@ -17,9 +17,9 @@ import qdarktheme
 from FeatureCraft_UI import FeatureCraft_Ui
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
-from utils.harris_utils import *
-from utils.helper_functions import *
-from utils.keypoint_descriptor import *
+from harris_utils import *
+from helper_functions import *
+from keypoint_descriptor import *
 
 
 class BackendClass(QMainWindow, FeatureCraft_Ui):
