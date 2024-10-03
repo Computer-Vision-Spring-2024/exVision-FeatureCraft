@@ -3,9 +3,7 @@ from matplotlib.patches import Circle
 
 
 def visualize_pyramid(pyramid):
-    fig, axes = plt.subplots(
-        nrows=len(pyramid), ncols=len(pyramid[0]), figsize=(12, 12)
-    )
+    _, axes = plt.subplots(nrows=len(pyramid), ncols=len(pyramid[0]), figsize=(12, 12))
 
     for i in range(len(pyramid)):
         for j in range(len(pyramid[i])):
@@ -18,7 +16,7 @@ def visualize_pyramid(pyramid):
 
 
 def visualize_DOC_for_octave(DOG):
-    fig, axes = plt.subplots(nrows=len(DOG), ncols=len(DOG[0]), figsize=(12, 12))
+    _, axes = plt.subplots(nrows=len(DOG), ncols=len(DOG[0]), figsize=(12, 12))
 
     for i in range(len(DOG)):
         for j in range(len(DOG[i])):
@@ -31,9 +29,7 @@ def visualize_DOC_for_octave(DOG):
 
 
 def visualize_keypoints(pyramid, keypoints):
-    fig, axes = plt.subplots(
-        nrows=len(pyramid), ncols=len(pyramid[0]), figsize=(12, 12)
-    )
+    _, axes = plt.subplots(nrows=len(pyramid), ncols=len(pyramid[0]), figsize=(12, 12))
 
     for i in range(len(pyramid)):
         for j in range(len(pyramid[i])):

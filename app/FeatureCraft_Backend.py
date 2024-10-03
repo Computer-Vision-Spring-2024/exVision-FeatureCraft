@@ -14,19 +14,18 @@ import numpy as np
 
 # in CMD: pip install qdarkstyle -> pip install pyqtdarktheme
 import qdarktheme
+from FeatureCraft_UI import FeatureCraft_Ui
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox
-
-from FeatureCraft_UI import Ui_MainWindow
 from utils.harris_utils import *
 from utils.helper_functions import *
 from utils.keypoint_descriptor import *
 
 
-class BackendClass(QMainWindow, Ui_MainWindow):
+class BackendClass(QMainWindow, FeatureCraft_Ui):
     def __init__(self):
         super().__init__()
-        self.ui = Ui_MainWindow()
+        self.ui = FeatureCraft_Ui()
         self.ui.setupUi(self)
 
         ### ==== HARRIS & LAMBDA-MINUS ==== ###
@@ -78,7 +77,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
 
         ### ==== General ==== ###
         # Connect menu action to load_image
-        self.ui.actionLoad_Image.triggered.connect(self.load_image)
+        self.ui.actionImport_Image.triggered.connect(self.load_image)
 
         # Set the icon and title
         self.change_the_icon()
@@ -205,7 +204,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 self.sift_target_image = image
                 self.display_image(
                     image,
-                    self.ui.input_1_figure_canvas,
+                    self.ui.sift_target_figure_canvas,
                     "Target Image",
                     False,
                 )
@@ -213,7 +212,7 @@ class BackendClass(QMainWindow, Ui_MainWindow):
                 self.sift_template_image = image
                 self.display_image(
                     image,
-                    self.ui.input_2_figure_canvas,
+                    self.ui.sift_template_figure_canvas,
                     "Template Image",
                     False,
                 )
