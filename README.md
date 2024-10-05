@@ -56,7 +56,7 @@ pip install -r requirements.txt
 
 ## Acknowledgments
 
-- Refer to [this organization's README](https://github.com/Computer-Vision-Spring-2024#acknowledgements) for more details about contributors and supervisors. 
+- Refer to [this organization's README](https://github.com/Computer-Vision-Spring-2024/exVision) for more details about contributors and supervisors. 
 - "Corner detection." (n.d.). In *Wikipedia*. Retrieved from [Wiki](https://en.wikipedia.org/wiki/Corner_detection)
 
 ## References 
