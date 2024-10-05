@@ -52,7 +52,7 @@ To be able to use our app, you can simply follow these steps:
 ```
 pip install -r requirements.txt
 ```
-3. Run the file with the name "FeatureCraft_Backend.py" in the [app folder](app).
+3. Run the file with the name "FeatureCraft_Backend.py" in the [app folder](FeatureCraft-PyQt-App).
 
 ## Acknowledgments
 
